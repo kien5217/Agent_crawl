@@ -1,0 +1,56 @@
+sources:
+  - id: "vnexpress-sohoa"
+    name: "VnExpress - Số hóa"
+    domain: "vnexpress.net"
+    rss_url: "https://vnexpress.net/rss/so-hoa.rss"
+    enabled: true
+
+  - id: "vietnamnet-congnghe"
+    name: "VietNamNet - Công nghệ"
+    domain: "vietnamnet.vn"
+    rss_url: "https://vietnamnet.vn/rss/cong-nghe.rss"
+    enabled: true
+
+  - id: "dantri-congnghe"
+    name: "Dân trí - Công nghệ"
+    domain: "dantri.com.vn"
+    rss_url: "https://dantri.com.vn/rss/cong-nghe.rss"
+    enabled: true
+
+  - id: "techcrunch"
+    name: "TechCrunch"
+    domain: "techcrunch.com"
+    rss_url: "https://techcrunch.com/feed/"
+    enabled: true
+
+  - id: "theverge"
+    name: "The Verge"
+    domain: "theverge.com"
+    rss_url: "https://www.theverge.com/rss/index.xml"
+    enabled: true
+
+  - id: "wired"
+    name: "WIRED"
+    domain: "wired.com"
+    rss_url: "https://www.wired.com/feed/rss"
+    enabled: true
+
+  - id: "engadget"
+    name: "Engadget"
+    domain: "engadget.com"
+    rss_url: "https://www.engadget.com/rss.xml"
+    enabled: true
+
+  - id: "bleepingcomputer"
+    name: "BleepingComputer"
+    domain: "bleepingcomputer.com"
+    rss_url: "https://www.bleepingcomputer.com/feed/"
+    enabled: true
+
+  - id: "securityweek"
+    name: "SecurityWeek"
+    domain: "securityweek.com"
+    rss_url: "https://www.securityweek.com/feed/"
+    sitemap_urls:
+    - "https://www.securityweek.com/sitemap.xml"
+    enabled: true

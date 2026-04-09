@@ -1,0 +1,24 @@
+database_url: "postgresql://postgres:postgres@localhost:5432/postgres"
+
+http:
+  timeout_seconds: 20
+  user_agent: "tech-crawler/0.1 (+local MVP)"
+  max_bytes: 4000000
+
+sitemap:
+  enabled: true
+  max_urls_per_source_per_run: 20000
+  max_sitemaps_per_index: 200
+  http_timeout_seconds: 25
+
+scheduler:
+  enqueue_limit_per_source: 1000
+
+worker:
+  max_attempts: 5
+  retry_backoff_seconds: 120
+  batch_size: 20
+  fetch_concurrency_per_worker: 1
+
+classify:
+  min_score_to_accept: 3

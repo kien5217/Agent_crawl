@@ -1,0 +1,96 @@
+topics:
+  - id: "ai"
+    name: "AI"
+    keywords:
+      - { term: "ai", weight: 2 }
+      - { term: "trí tuệ nhân tạo", weight: 4 }
+      - { term: "machine learning", weight: 4 }
+      - { term: "học máy", weight: 4 }
+      - { term: "deep learning", weight: 4 }
+      - { term: "llm", weight: 3 }
+      - { term: "gpt", weight: 3 }
+      - { term: "openai", weight: 2 }
+      - { term: "mô hình", weight: 1 }
+      - { term: "suy luận", weight: 1 }
+      - { term: "huấn luyện", weight: 1 }
+
+  - id: "security"
+    name: "An toàn thông tin"
+    keywords:
+      - { term: "an toàn thông tin", weight: 5 }
+      - { term: "bảo mật", weight: 4 }
+      - { term: "lỗ hổng", weight: 4 }
+      - { term: "vulnerability", weight: 3 }
+      - { term: "cve", weight: 4 }
+      - { term: "tấn công", weight: 2 }
+      - { term: "ransomware", weight: 4 }
+      - { term: "malware", weight: 4 }
+      - { term: "phishing", weight: 3 }
+      - { term: "leak", weight: 2 }
+      - { term: "zero-day", weight: 4 }
+
+  - id: "cloud"
+    name: "Cloud"
+    keywords:
+      - { term: "cloud", weight: 3 }
+      - { term: "điện toán đám mây", weight: 5 }
+      - { term: "aws", weight: 3 }
+      - { term: "gcp", weight: 3 }
+      - { term: "azure", weight: 3 }
+      - { term: "kubernetes", weight: 4 }
+      - { term: "k8s", weight: 3 }
+      - { term: "docker", weight: 3 }
+      - { term: "devops", weight: 3 }
+      - { term: "terraform", weight: 3 }
+      - { term: "ci/cd", weight: 2 }
+      - { term: "serverless", weight: 3 }
+
+  - id: "programming"
+    name: "Lập trình"
+    keywords:
+      - { term: "lập trình", weight: 4 }
+      - { term: "developer", weight: 2 }
+      - { term: "golang", weight: 4 }
+      - { term: "go", weight: 2 }
+      - { term: "python", weight: 3 }
+      - { term: "java", weight: 3 }
+      - { term: "javascript", weight: 3 }
+      - { term: "typescript", weight: 3 }
+      - { term: "framework", weight: 2 }
+      - { term: "library", weight: 2 }
+      - { term: "mã nguồn", weight: 2 }
+      - { term: "open source", weight: 2 }
+
+  - id: "blockchain"
+    name: "Blockchain"
+    keywords:
+      - { term: "blockchain", weight: 5 }
+      - { term: "chuỗi khối", weight: 5 }
+      - { term: "bitcoin", weight: 4 }
+      - { term: "btc", weight: 2 }
+      - { term: "ethereum", weight: 4 }
+      - { term: "eth", weight: 2 }
+      - { term: "web3", weight: 3 }
+      - { term: "smart contract", weight: 4 }
+      - { term: "hợp đồng thông minh", weight: 4 }
+      - { term: "token", weight: 2 }
+      - { term: "defi", weight: 3 }
+      
+  - id: "cve"
+    name: "CVE"
+    keywords:
+    - { term: "cve", weight: 5 }
+    - { term: "cve-", weight: 6 }
+    - { term: "cvss", weight: 4 }
+    - { term: "vulnerability", weight: 4 }
+    - { term: "lỗ hổng", weight: 4 }
+    - { term: "security advisory", weight: 4 }
+    - { term: "bản vá", weight: 3 }
+    - { term: "patch", weight: 3 }
+    - { term: "exploit", weight: 4 }
+    - { term: "poc", weight: 3 }
+    - { term: "proof of concept", weight: 4 }
+    - { term: "rce", weight: 4 }
+    - { term: "remote code execution", weight: 5 }
+    - { term: "privilege escalation", weight: 4 }
+    - { term: "zero-day", weight: 5 }
