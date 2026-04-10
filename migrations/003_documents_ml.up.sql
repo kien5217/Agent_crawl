@@ -1,0 +1,10 @@
+ALTER TABLE documents
+  ADD COLUMN IF NOT EXISTS ml_topic_id TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS ml_confidence REAL NOT NULL DEFAULT 0.0,
+  ADD COLUMN IF NOT EXISTS ml_scores JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS ml_model_name TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS ml_model_version INT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS ml_predicted_at TIMESTAMPTZ NULL;
+
+CREATE INDEX IF NOT EXISTS idx_documents_ml_topic_time
+  ON documents (ml_topic_id, ml_predicted_at DESC);
