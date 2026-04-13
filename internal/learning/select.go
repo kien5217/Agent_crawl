@@ -24,7 +24,7 @@ func SelectBatchForLabeling(conn *pgx.Conn, bundle *modelbundle.Bundle, docIDs [
 	for i := range docIDs {
 		xs[i] = vec.Transform(titles[i] + "\n" + contents[i])
 	}
-	return active.SelectBatch(model, docIDs, xs, batchSize, 0.80)
+	return active.SelectBatchBalanced(model, docIDs, xs, batchSize, 0.80)
 }
 
 // compute margin for saving in label_queue (optional)

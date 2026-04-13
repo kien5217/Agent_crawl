@@ -23,6 +23,50 @@ func (wl *WeakLabeler) Label(title, content string) (string, float32, string, bo
 	}
 
 	s := strings.ToLower(txt)
+
+	// --- AI (anchors) ---
+	if strings.Contains(s, "large language model") || strings.Contains(s, "llm") ||
+		strings.Contains(s, "fine-tuning") || strings.Contains(s, "transformer") {
+		return "ai", 0.85, "anchor:ai_llm_transformer", true
+	}
+	if strings.Contains(s, "diffusion") && (strings.Contains(s, "image") || strings.Contains(s, "text-to-image")) {
+		return "ai", 0.80, "anchor:ai_diffusion", true
+	}
+
+	// --- Cloud (anchors) ---
+	if strings.Contains(s, "kubernetes") || strings.Contains(s, "k8s") {
+		return "cloud", 0.85, "anchor:cloud_k8s", true
+	}
+	if strings.Contains(s, "terraform") {
+		return "cloud", 0.80, "anchor:cloud_terraform", true
+	}
+	if strings.Contains(s, "aws") || strings.Contains(s, "gcp") || strings.Contains(s, "azure") {
+		// cẩn thận: từ này có thể xuất hiện trong nhiều bài; giữ confidence vừa thôi
+		return "cloud", 0.75, "anchor:cloud_hyperscaler", true
+	}
+
+	// --- Programming (anchors) ---
+	if strings.Contains(s, "golang") || strings.Contains(s, "go ") || strings.Contains(s, "rust") ||
+		strings.Contains(s, "typescript") || strings.Contains(s, "python") {
+		// "go " dễ dính tiếng Anh (go to...), nên nếu dùng thì cần rule chặt hơn theo ngữ cảnh
+		return "programming", 0.75, "anchor:prog_lang", true
+	}
+	if strings.Contains(s, "github repository") || strings.Contains(s, "release v") {
+		return "programming", 0.70, "anchor:prog_release", true
+	}
+
+	// --- Blockchain (anchors) ---
+	if strings.Contains(s, "ethereum") || strings.Contains(s, "solidity") ||
+		strings.Contains(s, "smart contract") || strings.Contains(s, "defi") {
+		return "blockchain", 0.85, "anchor:blockchain_eth_sc", true
+	}
+
+	// --- Security (anchors, không phải CVE) ---
+	// Nếu bạn muốn tách "security" với "cve", giữ security cho các bài ransomware/phishing/incident…
+	if strings.Contains(s, "ransomware") || strings.Contains(s, "phishing") ||
+		strings.Contains(s, "malware") || strings.Contains(s, "data breach") {
+		return "security", 0.85, "anchor:security_incident", true
+	}
 	// Strong-ish CVE signals
 	if strings.Contains(s, "cvss") && (strings.Contains(s, "vulnerability") || strings.Contains(s, "lỗ hổng")) {
 		return "cve", 0.85, "anchor:cvss+vuln", true
@@ -31,7 +75,6 @@ func (wl *WeakLabeler) Label(title, content string) (string, float32, string, bo
 		return "cve", 0.90, "anchor:cve_dash", true
 	}
 
-	// Nếu bạn muốn bootstrapping cho các topic khác, thêm rules tương tự.
 	return "", 0, "", false
 }
 
