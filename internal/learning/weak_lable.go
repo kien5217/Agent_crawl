@@ -78,6 +78,7 @@ func (wl *WeakLabeler) Label(title, content string) (string, float32, string, bo
 	return "", 0, "", false
 }
 
+// ApplyWeakLabels thực hiện việc áp dụng weak labeling cho một slice các DocForLearning. Nó sử dụng một WeakLabeler để gán nhãn cho từng tài liệu dựa trên tiêu đề và nội dung của nó. Kết quả trả về là một slice các struct chứa DocID, TopicID, Confidence và RuleID cho những tài liệu đã được gán nhãn thành công. Nếu một tài liệu không khớp với bất kỳ quy tắc weak labeling nào, nó sẽ bị bỏ qua.
 func ApplyWeakLabels(docs []db.DocForLearning, wl *WeakLabeler) []struct {
 	DocID      int64
 	TopicID    string

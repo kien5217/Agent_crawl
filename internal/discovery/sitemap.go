@@ -56,6 +56,7 @@ func (d *SitemapDiscovery) Enqueue(ctx context.Context, conn *pgx.Conn) (int, er
 	return total, nil
 }
 
+// enqueueSource thực hiện việc enqueue các URL từ sitemap của một nguồn tin cụ thể. Nó giới hạn số lượng URL được enqueue dựa trên cấu hình để tránh quá tải hệ thống. Hàm này gọi processSitemapAny để xử lý từng URL trong sitemap, bao gồm cả việc phân tích cú pháp và chuẩn hóa URL trước khi enqueue vào hàng đợi crawl. Nếu có lỗi trong quá trình xử lý sitemap, nó sẽ ghi log cảnh báo và tiếp tục với URL tiếp theo.
 func (d *SitemapDiscovery) enqueueSource(ctx context.Context, conn *pgx.Conn, s config.Source) (int, error) {
 	limit := d.cfg.Sitemap.MaxURLsPerSourcePerRun
 	if limit <= 0 {
@@ -77,6 +78,7 @@ func (d *SitemapDiscovery) enqueueSource(ctx context.Context, conn *pgx.Conn, s 
 	return added, nil
 }
 
+// processSitemapAny thực hiện việc xử lý một URL sitemap, bao gồm cả việc phân tích cú pháp và chuẩn hóa URL trước khi enqueue vào hàng đợi crawl. Hàm này có thể xử lý cả sitemap index và url set, và nó sẽ gọi đệ quy nếu gặp sitemap index để xử lý các sitemap con. Nó cũng giới hạn độ sâu của sitemap để tránh vòng lặp vô hạn và giới hạn số lượng URL được enqueue dựa trên cấu hình.
 func (d *SitemapDiscovery) processSitemapAny(ctx context.Context, conn *pgx.Conn, s config.Source, sitemapURL string, remaining int, depth int) (int, error) {
 	if remaining <= 0 {
 		return 0, nil
@@ -159,6 +161,7 @@ func (d *SitemapDiscovery) processSitemapAny(ctx context.Context, conn *pgx.Conn
 	}
 }
 
+// httpGetBytes thực hiện việc gửi yêu cầu HTTP GET đến URL được cung cấp và trả về nội dung của phản hồi dưới dạng byte slice. Nó thiết lập User-Agent trong header của yêu cầu và giới hạn kích thước của phản hồi để tránh quá tải bộ nhớ. Nếu phản hồi có mã trạng thái từ 400 trở lên, nó sẽ trả về lỗi tương ứng.
 func (d *SitemapDiscovery) httpGetBytes(ctx context.Context, u string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -178,6 +181,7 @@ func (d *SitemapDiscovery) httpGetBytes(ctx context.Context, u string) ([]byte, 
 	return io.ReadAll(r)
 }
 
+// detectRootTag thực hiện việc phát hiện thẻ gốc của một tài liệu XML dựa trên nội dung của nó. Hàm này chuyển đổi byte slice thành chuỗi và kiểm tra xem nó có chứa thẻ <sitemapindex> hoặc <urlset> hay không. Nếu tìm thấy thẻ <sitemapindex>, nó trả về "sitemapindex". Nếu tìm thấy thẻ <urlset>, nó trả về "urlset". Nếu không tìm thấy bất kỳ thẻ nào trong số đó, nó trả về một chuỗi rỗng.
 func detectRootTag(b []byte) string {
 	s := strings.ToLower(string(b))
 	// crude but effective MVP

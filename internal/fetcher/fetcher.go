@@ -26,6 +26,7 @@ func New(cfg config.Config) *Fetcher {
 	}
 }
 
+// Get thực hiện việc gửi yêu cầu HTTP GET đến URL được cung cấp, trả về nội dung của phản hồi dưới dạng byte slice, loại nội dung (Content-Type), mã trạng thái HTTP và lỗi nếu có. Nó thiết lập User-Agent trong header của yêu cầu và giới hạn kích thước của phản hồi để tránh quá tải bộ nhớ. Nếu phản hồi có mã trạng thái từ 400 trở lên, nó sẽ trả về lỗi tương ứng.
 func (f *Fetcher) Get(ctx context.Context, url string) ([]byte, string, int, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

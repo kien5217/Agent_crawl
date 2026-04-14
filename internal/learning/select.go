@@ -49,7 +49,7 @@ func ComputeMargins(bundle *modelbundle.Bundle, docIDs []int64, titles []string,
 		}
 		out = append(out, Pick{DocID: docIDs[i], Margin: p1 - p2})
 	}
-
+	// sort by margin ascending (uncertainty sampling)
 	sort.Slice(out, func(i, j int) bool { return out[i].Margin < out[j].Margin })
 	return out
 }
@@ -65,7 +65,7 @@ func SavePicksToQueue(ctx interface{}, conn *pgx.Conn, picks []Pick) error {
 
 // Helper: enqueue picked IDs (margin lookup from pick list)
 func EnqueueLabelQueueByIDs(ctxContext interface{}, conn *pgx.Conn, picks []Pick, pickedIDs []int64) error {
-	pickMap := map[int64]float32{}
+	pickMap := map[int64]float32{} // docID -> margin
 	for _, p := range picks {
 		pickMap[p.DocID] = float32(p.Margin)
 	}

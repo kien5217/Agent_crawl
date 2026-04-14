@@ -88,8 +88,9 @@ func (d *RSSDiscovery) Enqueue(ctx context.Context, conn *pgx.Conn) (int, error)
 	return enqueued, nil
 }
 
+// fetchFeed thực hiện việc gửi yêu cầu HTTP để lấy nội dung của RSS feed từ URL được cung cấp, sử dụng gofeed để phân tích cú pháp và trả về đối tượng Feed. Nó thiết lập User-Agent trong header của yêu cầu và giới hạn kích thước của phản hồi để tránh quá tải bộ nhớ. Nếu có lỗi trong quá trình gửi yêu cầu hoặc phân tích cú pháp, nó sẽ trả về lỗi tương ứng.
 func (d *RSSDiscovery) fetchFeed(ctx context.Context, fp *gofeed.Parser, rssURL string) (*gofeed.Feed, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rssURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rssURL, nil) // Tạo yêu cầu HTTP với context để có thể hủy bỏ nếu cần thiết
 	if err != nil {
 		return nil, err
 	}
