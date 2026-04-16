@@ -11,6 +11,7 @@ type Pick struct {
 	Margin float64
 }
 
+// hàm này chọn batch các document ID để labeling dựa trên model và vectorizer trong bundle, sử dụng phương pháp chọn batch cân bằng (balanced batch selection) với ngưỡng 0.80.
 func SelectBatchForLabeling(bundle *ml.Bundle, docIDs []int64, titles []string, contents []string, batchSize int) []int64 {
 	vec := bundle.Vectorizer
 	model := bundle.Model
@@ -22,7 +23,7 @@ func SelectBatchForLabeling(bundle *ml.Bundle, docIDs []int64, titles []string, 
 	return ml.SelectBatchBalanced(model, docIDs, xs, batchSize, 0.80)
 }
 
-// compute margin for saving in label_queue (optional)
+// tính margin giữa xác suất dự đoán của hai lớp có xác suất cao nhất để đánh giá độ không chắc chắn của mô hình đối với từng document, sau đó sắp xếp các document theo margin tăng dần để ưu tiên labeling cho những document mà mô hình ít chắc chắn nhất.
 func ComputeMargins(bundle *ml.Bundle, docIDs []int64, titles []string, contents []string) []Pick {
 	vec := bundle.Vectorizer
 	model := bundle.Model
@@ -44,7 +45,7 @@ func ComputeMargins(bundle *ml.Bundle, docIDs []int64, titles []string, contents
 		}
 		out = append(out, Pick{DocID: docIDs[i], Margin: p1 - p2})
 	}
-	// sort by margin ascending (uncertainty sampling)
+	// sắp xếp các document theo margin tăng dần để ưu tiên labeling cho những document mà mô hình ít chắc chắn nhất.
 	sort.Slice(out, func(i, j int) bool { return out[i].Margin < out[j].Margin })
 	return out
 }

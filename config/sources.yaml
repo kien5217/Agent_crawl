@@ -35,12 +35,6 @@ sources:
     rss_url: "https://www.wired.com/feed/rss"
     enabled: true
 
-  - id: "engadget"
-    name: "Engadget"
-    domain: "engadget.com"
-    rss_url: "https://www.engadget.com/rss.xml"
-    enabled: true
-
   - id: "bleepingcomputer"
     name: "BleepingComputer"
     domain: "bleepingcomputer.com"
