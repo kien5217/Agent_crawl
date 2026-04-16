@@ -16,7 +16,7 @@ import (
 	"Agent_Crawl/internal/infrastructure/discovery"
 	"Agent_Crawl/internal/infrastructure/persistence/postgres"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -43,7 +43,7 @@ type commandOptions struct {
 
 type runtime struct {
 	appCfg *config.AppConfig
-	conn   *pgx.Conn
+	db     *pgxpool.Pool
 	store  *postgres.Store
 }
 
@@ -75,7 +75,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("bootstrap failed")
 	}
-	defer rt.conn.Close(ctx)
+	defer rt.db.Close()
 
 	runCommand(ctx, cmd, opts, rt)
 }
@@ -124,12 +124,12 @@ func initRuntime(ctx context.Context, configPath string) (*runtime, error) {
 	}
 
 	databaseURL := os.ExpandEnv(appCfg.Config.DatabaseURL)
-	conn, err := postgres.Open(ctx, databaseURL)
+	db, err := postgres.Open(ctx, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
-	return &runtime{appCfg: appCfg, conn: conn, store: postgres.NewStore(conn)}, nil
+	return &runtime{appCfg: appCfg, db: db, store: postgres.NewStore(db)}, nil
 }
 
 func runCommand(ctx context.Context, cmd string, opts commandOptions, rt *runtime) {

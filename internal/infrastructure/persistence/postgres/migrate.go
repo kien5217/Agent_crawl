@@ -6,11 +6,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func Migrate(ctx context.Context, conn *pgx.Conn, migrationsDir string) error {
+func Migrate(ctx context.Context, db DB, migrationsDir string) error {
 	entries, err := os.ReadDir(migrationsDir)
 	if err != nil {
 		return err
@@ -32,7 +30,7 @@ func Migrate(ctx context.Context, conn *pgx.Conn, migrationsDir string) error {
 		if err != nil {
 			return err
 		}
-		if _, err := conn.Exec(ctx, string(b)); err != nil {
+		if _, err := db.Exec(ctx, string(b)); err != nil {
 			return err
 		}
 	}

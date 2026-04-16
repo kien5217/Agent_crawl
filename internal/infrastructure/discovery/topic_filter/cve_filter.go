@@ -41,7 +41,9 @@ func looksLikeCVEByText(title, desc string) bool {
 		strings.Contains(s, "vulnerability") ||
 		strings.Contains(s, "lỗ hổng") ||
 		strings.Contains(s, "security advisory") ||
-		strings.Contains(s, "rce") ||
-		strings.Contains(s, "proof of concept") ||
-		strings.Contains(s, "poc")
+		strings.Contains(s, "security bulletin") ||
+		strings.Contains(s, "exploit") ||
+		strings.Contains(s, "zero-day") ||
+		strings.Contains(s, "patch") ||
+		strings.Contains(s, "mitigation")
 }

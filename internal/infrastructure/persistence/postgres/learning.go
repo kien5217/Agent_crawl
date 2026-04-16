@@ -5,15 +5,13 @@ import (
 	"time"
 
 	"Agent_Crawl/internal/domain/model"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func ListDocsForWeakLabel(ctx context.Context, conn *pgx.Conn, limit int) ([]model.LearningDocument, error) {
+func ListDocsForWeakLabel(ctx context.Context, db DB, limit int) ([]model.LearningDocument, error) {
 	if limit <= 0 || limit > 50000 {
 		limit = 5000
 	}
-	rows, err := conn.Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT d.id, d.title, d.content_text
 		FROM documents d
 		LEFT JOIN labels_weak lw ON lw.document_id = d.id
@@ -38,8 +36,8 @@ func ListDocsForWeakLabel(ctx context.Context, conn *pgx.Conn, limit int) ([]mod
 	return out, rows.Err()
 }
 
-func UpsertWeakLabel(ctx context.Context, conn *pgx.Conn, docID int64, topicID string, confidence float32, ruleID string) error {
-	_, err := conn.Exec(ctx, `
+func UpsertWeakLabel(ctx context.Context, db DB, docID int64, topicID string, confidence float32, ruleID string) error {
+	_, err := db.Exec(ctx, `
 		INSERT INTO labels_weak (document_id, topic_id, confidence, rule_id)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (document_id, topic_id, rule_id)
@@ -48,11 +46,11 @@ func UpsertWeakLabel(ctx context.Context, conn *pgx.Conn, docID int64, topicID s
 	return err
 }
 
-func ListTrainingSet(ctx context.Context, conn *pgx.Conn, minWeakConf float32, limit int) ([]model.LearningDocument, error) {
+func ListTrainingSet(ctx context.Context, db DB, minWeakConf float32, limit int) ([]model.LearningDocument, error) {
 	if limit <= 0 || limit > 200000 {
 		limit = 50000
 	}
-	rows, err := conn.Query(ctx, `
+	rows, err := db.Query(ctx, `
 		WITH gold AS (
 		  SELECT d.id, d.title, d.content_text, lg.topic_id
 		  FROM labels_gold lg
@@ -88,8 +86,8 @@ func ListTrainingSet(ctx context.Context, conn *pgx.Conn, minWeakConf float32, l
 	return out, rows.Err()
 }
 
-func SaveModel(ctx context.Context, conn *pgx.Conn, name string, version int, classesJSON []byte, blob []byte) error {
-	_, err := conn.Exec(ctx, `
+func SaveModel(ctx context.Context, db DB, name string, version int, classesJSON []byte, blob []byte) error {
+	_, err := db.Exec(ctx, `
 		INSERT INTO models (name, version, classes, blob)
 		VALUES ($1, $2, $3::jsonb, $4)
 		ON CONFLICT (name, version) DO UPDATE SET
@@ -100,8 +98,8 @@ func SaveModel(ctx context.Context, conn *pgx.Conn, name string, version int, cl
 	return err
 }
 
-func LoadLatestModel(ctx context.Context, conn *pgx.Conn, name string) (version int, blob []byte, err error) {
-	err = conn.QueryRow(ctx, `
+func LoadLatestModel(ctx context.Context, db DB, name string) (version int, blob []byte, err error) {
+	err = db.QueryRow(ctx, `
 		SELECT version, blob
 		FROM models
 		WHERE name = $1
@@ -111,11 +109,11 @@ func LoadLatestModel(ctx context.Context, conn *pgx.Conn, name string) (version 
 	return
 }
 
-func ListUnlabeledDocs(ctx context.Context, conn *pgx.Conn, limit int) (ids []int64, titles []string, contents []string, err error) {
+func ListUnlabeledDocs(ctx context.Context, db DB, limit int) (ids []int64, titles []string, contents []string, err error) {
 	if limit <= 0 || limit > 200000 {
 		limit = 50000
 	}
-	rows, err := conn.Query(ctx, `
+	rows, err := db.Query(ctx, `
 		SELECT d.id, d.title, d.content_text
 		FROM documents d
 		LEFT JOIN labels_gold lg ON lg.document_id = d.id
@@ -142,8 +140,8 @@ func ListUnlabeledDocs(ctx context.Context, conn *pgx.Conn, limit int) (ids []in
 	return ids, titles, contents, rows.Err()
 }
 
-func EnqueueLabelQueue(ctx context.Context, conn *pgx.Conn, docID int64, reason string, margin float32) error {
-	_, err := conn.Exec(ctx, `
+func EnqueueLabelQueue(ctx context.Context, db DB, docID int64, reason string, margin float32) error {
+	_, err := db.Exec(ctx, `
 		INSERT INTO label_queue (document_id, reason, margin, status)
 		VALUES ($1, $2, $3, 'pending')
 		ON CONFLICT (document_id) DO UPDATE SET
@@ -153,7 +151,7 @@ func EnqueueLabelQueue(ctx context.Context, conn *pgx.Conn, docID int64, reason 
 	return err
 }
 
-func UpdateDocumentML(ctx context.Context, conn *pgx.Conn,
+func UpdateDocumentML(ctx context.Context, db DB,
 	docID int64,
 	modelName string,
 	modelVersion int,
@@ -162,7 +160,7 @@ func UpdateDocumentML(ctx context.Context, conn *pgx.Conn,
 	mlScoresJSON string,
 	predictedAt time.Time,
 ) error {
-	_, err := conn.Exec(ctx, `
+	_, err := db.Exec(ctx, `
 		UPDATE documents
 		SET ml_topic_id = $2,
 		    ml_confidence = $3,

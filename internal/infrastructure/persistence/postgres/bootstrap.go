@@ -4,13 +4,11 @@ import (
 	"context"
 
 	"Agent_Crawl/internal/domain/config"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func UpsertTopics(ctx context.Context, conn *pgx.Conn, tf config.TopicsFile) error {
+func UpsertTopics(ctx context.Context, db DB, tf config.TopicsFile) error {
 	for _, t := range tf.Topics {
-		_, err := conn.Exec(ctx, `
+		_, err := db.Exec(ctx, `
 			INSERT INTO topics (id, name, keywords, enabled)
 			VALUES ($1, $2, $3::jsonb, TRUE)
 			ON CONFLICT (id) DO UPDATE SET
@@ -25,9 +23,9 @@ func UpsertTopics(ctx context.Context, conn *pgx.Conn, tf config.TopicsFile) err
 	return nil
 }
 
-func UpsertSources(ctx context.Context, conn *pgx.Conn, sf config.SourcesFile) error {
+func UpsertSources(ctx context.Context, db DB, sf config.SourcesFile) error {
 	for _, s := range sf.Sources {
-		_, err := conn.Exec(ctx, `
+		_, err := db.Exec(ctx, `
 			INSERT INTO sources (id, name, domain, rss_url, enabled)
 			VALUES ($1, $2, $3, $4, $5)
 			ON CONFLICT (id) DO UPDATE SET

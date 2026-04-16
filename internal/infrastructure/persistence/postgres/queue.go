@@ -5,12 +5,10 @@ import (
 	"time"
 
 	"Agent_Crawl/internal/domain/model"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func EnqueueURL(ctx context.Context, conn *pgx.Conn, topicID, sourceID, url, domain string, priority int) (bool, error) {
-	ct, err := conn.Exec(ctx, `
+func EnqueueURL(ctx context.Context, db DB, topicID, sourceID, url, domain string, priority int) (bool, error) {
+	ct, err := db.Exec(ctx, `
 		INSERT INTO crawl_queue (topic_id, source_id, url, domain, priority, status, next_run_at)
 		VALUES ($1, $2, $3, $4, $5, 'pending', now())
 		ON CONFLICT (url) DO NOTHING
@@ -21,8 +19,8 @@ func EnqueueURL(ctx context.Context, conn *pgx.Conn, topicID, sourceID, url, dom
 	return ct.RowsAffected() == 1, nil
 }
 
-func DequeueBatch(ctx context.Context, conn *pgx.Conn, batchSize int) ([]model.QueueItem, error) {
-	tx, err := conn.Begin(ctx)
+func DequeueBatch(ctx context.Context, db TxBeginner, batchSize int) ([]model.QueueItem, error) {
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +73,8 @@ func DequeueBatch(ctx context.Context, conn *pgx.Conn, batchSize int) ([]model.Q
 	return items, nil
 }
 
-func MarkDone(ctx context.Context, conn *pgx.Conn, id int64) error {
-	_, err := conn.Exec(ctx, `
+func MarkDone(ctx context.Context, db DB, id int64) error {
+	_, err := db.Exec(ctx, `
 		UPDATE crawl_queue
 		SET status = 'done', updated_at = now()
 		WHERE id = $1
@@ -84,8 +82,8 @@ func MarkDone(ctx context.Context, conn *pgx.Conn, id int64) error {
 	return err
 }
 
-func MarkFailed(ctx context.Context, conn *pgx.Conn, id int64, maxAttempts int, nextRunAt time.Time, lastErr string) error {
-	_, err := conn.Exec(ctx, `
+func MarkFailed(ctx context.Context, db DB, id int64, maxAttempts int, nextRunAt time.Time, lastErr string) error {
+	_, err := db.Exec(ctx, `
 		UPDATE crawl_queue
 		SET status = CASE WHEN $2 >= attempts THEN 'failed' ELSE 'pending' END,
 		    attempts = attempts + 1,
