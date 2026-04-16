@@ -1,16 +1,30 @@
-package discovery
+package topicfilter
 
 import "strings"
 
-// Lọc nhanh theo URL (dùng cho sitemap backfill).
-func LooksLikeCVEByURL(u string) bool {
+type CVETopicFilter struct{}
+
+func NewCVETopicFilter() TopicHeuristicFilter {
+	return CVETopicFilter{}
+}
+
+func (CVETopicFilter) TopicID() string {
+	return "cve"
+}
+
+func (CVETopicFilter) MatchURL(u string) bool {
+	return looksLikeCVEByURL(u)
+}
+
+func (CVETopicFilter) MatchText(title, desc string) bool {
+	return looksLikeCVEByText(title, desc)
+}
+
+func looksLikeCVEByURL(u string) bool {
 	s := strings.ToLower(u)
-	// Những pattern hay gặp trên site security:
-	// - chứa CVE ID
 	if strings.Contains(s, "cve-") {
 		return true
 	}
-	// Một số site đặt đường dẫn có "cve" hoặc "vulnerability"
 	if strings.Contains(s, "/cve/") || strings.Contains(s, "-cve-") || strings.Contains(s, "cve") {
 		return true
 	}
@@ -20,8 +34,7 @@ func LooksLikeCVEByURL(u string) bool {
 	return false
 }
 
-// Lọc theo text (dùng cho RSS: title+desc).
-func LooksLikeCVEByText(title, desc string) bool {
+func looksLikeCVEByText(title, desc string) bool {
 	s := strings.ToLower(title + " " + desc)
 	return strings.Contains(s, "cve-") ||
 		strings.Contains(s, "cvss") ||

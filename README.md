@@ -127,7 +127,7 @@ Cả `RSSDiscovery` và `SitemapDiscovery` implement interface này. `Service.Ru
 #### RSS discovery
 - Duyệt qua source `enabled` có `rss_url`.
 - Parse feed bằng `gofeed`.
-- Lọc bằng `LooksLikeCVEByText(title, desc)`.
+- Match topic theo `source.topic_ids`; `cve` vẫn có heuristic riêng mạnh hơn.
 - URL được normalize trước khi enqueue.
 - Enqueue với priority `10`.
 
@@ -135,7 +135,7 @@ Cả `RSSDiscovery` và `SitemapDiscovery` implement interface này. `Service.Ru
 - Chỉ chạy khi `sitemap.enabled = true`.
 - Hỗ trợ cả `sitemapindex` lẫn `urlset`.
 - Giới hạn depth recursion, max child sitemap, max URLs per source.
-- Lọc URL bằng `LooksLikeCVEByURL`.
+- Match URL theo `source.topic_ids`; `cve` vẫn dùng thêm heuristic URL.
 - Enqueue với priority `0`.
 
 ### 3.3 Queue & worker processing

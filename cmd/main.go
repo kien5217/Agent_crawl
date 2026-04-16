@@ -138,8 +138,8 @@ func runCommand(ctx context.Context, cmd string, opts commandOptions, rt *runtim
 		Bootstrap: rt.store,
 		Migrate:   rt.store,
 		Scheduler: appschedule.NewService(
-			discovery.NewRSSDiscovery(rt.appCfg.Config, rt.appCfg.Sources, rt.store),
-			discovery.NewSitemapDiscovery(rt.appCfg.Config, rt.appCfg.Sources, rt.store),
+			discovery.NewRSSDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
+			discovery.NewSitemapDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
 		),
 		Queue:    rt.store,
 		Document: rt.store,

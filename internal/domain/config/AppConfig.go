@@ -63,5 +63,6 @@ type Source struct {
 	Domain      string   `yaml:"domain"`
 	RSSURL      string   `yaml:"rss_url"`
 	SitemapURLs []string `yaml:"sitemap_urls"`
+	TopicIDs    []string `yaml:"topic_ids"`
 	Enabled     bool     `yaml:"enabled"`
 }

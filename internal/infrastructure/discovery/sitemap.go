@@ -11,6 +11,7 @@ import (
 
 	"Agent_Crawl/internal/domain/config"
 	"Agent_Crawl/internal/domain/repository"
+	topicfilter "Agent_Crawl/internal/infrastructure/discovery/topic_filter"
 
 	"github.com/rs/zerolog/log"
 )
@@ -18,11 +19,12 @@ import (
 type SitemapDiscovery struct {
 	cfg     config.Config
 	sources config.SourcesFile
+	matcher *topicfilter.TopicMatcher
 	client  *http.Client
 	q       repository.QueueRepository
 }
 
-func NewSitemapDiscovery(cfg config.Config, sources config.SourcesFile, q repository.QueueRepository) *SitemapDiscovery {
+func NewSitemapDiscovery(cfg config.Config, topics config.TopicsFile, sources config.SourcesFile, q repository.QueueRepository) *SitemapDiscovery {
 	to := cfg.Sitemap.HTTPTimeoutSeconds
 	if to <= 0 {
 		to = cfg.HTTP.TimeoutSeconds
@@ -30,6 +32,7 @@ func NewSitemapDiscovery(cfg config.Config, sources config.SourcesFile, q reposi
 	return &SitemapDiscovery{
 		cfg:     cfg,
 		sources: sources,
+		matcher: topicfilter.NewTopicMatcher(topics),
 		client:  &http.Client{Timeout: time.Duration(to) * time.Second},
 		q:       q,
 	}
@@ -142,15 +145,15 @@ func (d *SitemapDiscovery) processSitemapAny(ctx context.Context, s config.Sourc
 			if loc == "" {
 				continue
 			}
-			// Lọc CVE theo URL (2A)
-			if !LooksLikeCVEByURL(loc) {
+			topicID, ok := d.matcher.MatchURL(s.TopicIDs, loc)
+			if !ok {
 				continue
 			}
 			norm, domain, ok := NormalizeURL(loc)
 			if !ok {
 				continue
 			}
-			ins, err := d.q.EnqueueURL(ctx, "cve", s.ID, norm, domain, 0) // priority thấp hơn RSS
+			ins, err := d.q.EnqueueURL(ctx, topicID, s.ID, norm, domain, 0) // priority thấp hơn RSS
 			if err != nil {
 				log.Warn().Err(err).Str("url", norm).Msg("enqueue failed")
 				continue

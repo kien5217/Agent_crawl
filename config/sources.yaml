@@ -3,42 +3,49 @@ sources:
     name: "VnExpress - Số hóa"
     domain: "vnexpress.net"
     rss_url: "https://vnexpress.net/rss/so-hoa.rss"
+    topic_ids: ["ai", "cloud", "programming"]
     enabled: true
 
   - id: "vietnamnet-congnghe"
     name: "VietNamNet - Công nghệ"
     domain: "vietnamnet.vn"
     rss_url: "https://vietnamnet.vn/rss/cong-nghe.rss"
+    topic_ids: ["ai", "cloud", "programming"]
     enabled: true
 
   - id: "dantri-congnghe"
     name: "Dân trí - Công nghệ"
     domain: "dantri.com.vn"
     rss_url: "https://dantri.com.vn/rss/cong-nghe.rss"
+    topic_ids: ["ai", "cloud", "programming"]
     enabled: true
 
   - id: "techcrunch"
     name: "TechCrunch"
     domain: "techcrunch.com"
     rss_url: "https://techcrunch.com/feed/"
+    topic_ids: ["ai", "cloud"]
     enabled: true
 
   - id: "theverge"
     name: "The Verge"
     domain: "theverge.com"
     rss_url: "https://www.theverge.com/rss/index.xml"
+    topic_ids: ["ai", "cloud"]
     enabled: true
 
   - id: "wired"
     name: "WIRED"
     domain: "wired.com"
     rss_url: "https://www.wired.com/feed/rss"
+    topic_ids: ["ai", "cloud"]
     enabled: true
 
   - id: "bleepingcomputer"
     name: "BleepingComputer"
     domain: "bleepingcomputer.com"
     rss_url: "https://www.bleepingcomputer.com/feed/"
+    topic_ids: ["cve", "security", "cloud"]
     enabled: true
 
   - id: "securityweek"
@@ -47,4 +54,5 @@ sources:
     rss_url: "https://www.securityweek.com/feed/"
     sitemap_urls:
     - "https://www.securityweek.com/sitemap.xml"
+    topic_ids: ["cve", "security", "cloud"]
     enabled: true

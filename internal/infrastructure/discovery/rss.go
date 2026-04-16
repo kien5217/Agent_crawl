@@ -9,6 +9,7 @@ import (
 
 	"Agent_Crawl/internal/domain/config"
 	"Agent_Crawl/internal/domain/repository"
+	topicfilter "Agent_Crawl/internal/infrastructure/discovery/topic_filter"
 
 	"github.com/mmcdole/gofeed"
 	"github.com/rs/zerolog/log"
@@ -17,14 +18,16 @@ import (
 type RSSDiscovery struct {
 	cfg     config.Config
 	sources config.SourcesFile
+	matcher *topicfilter.TopicMatcher
 	client  *http.Client
 	q       repository.QueueRepository
 } // RSSDiscovery implements Discovery interface. Nó sử dụng gofeed để phân tích cú pháp RSS feed từ các nguồn tin được cấu hình, chuẩn hóa URL của từng mục trong feed và enqueue chúng vào hàng đợi crawl. Nó cũng xử lý lỗi khi phân tích cú pháp hoặc enqueue và ghi log cảnh báo nếu có vấn đề với một nguồn tin cụ thể.
 // Khởi tạo RSSDiscovery với cấu hình và danh sách nguồn tin, đồng thời thiết lập một HTTP client với timeout được cấu hình. Hàm Enqueue sẽ được gọi để lấy các mục từ RSS feed, chuẩn hóa URL và enqueue chúng vào hàng đợi crawl. Nó giới hạn số lượng mục được enqueue từ mỗi nguồn tin dựa trên cấu hình để tránh quá tải hệ thống.
-func NewRSSDiscovery(cfg config.Config, sources config.SourcesFile, q repository.QueueRepository) *RSSDiscovery {
+func NewRSSDiscovery(cfg config.Config, topics config.TopicsFile, sources config.SourcesFile, q repository.QueueRepository) *RSSDiscovery {
 	return &RSSDiscovery{
 		cfg:     cfg,
 		sources: sources,
+		matcher: topicfilter.NewTopicMatcher(topics),
 		client:  &http.Client{Timeout: time.Duration(cfg.HTTP.TimeoutSeconds) * time.Second},
 		q:       q,
 	}
@@ -68,7 +71,8 @@ func (d *RSSDiscovery) Enqueue(ctx context.Context) (int, error) {
 				desc = item.Description
 			}
 
-			if !LooksLikeCVEByText(title, desc) {
+			topicID, ok := d.matcher.MatchText(s.TopicIDs, title, desc)
+			if !ok {
 				continue
 			}
 
@@ -77,7 +81,7 @@ func (d *RSSDiscovery) Enqueue(ctx context.Context) (int, error) {
 				continue
 			}
 
-			inserted, err := d.q.EnqueueURL(ctx, "cve", s.ID, norm, domain, 10)
+			inserted, err := d.q.EnqueueURL(ctx, topicID, s.ID, norm, domain, 10)
 			if err != nil {
 				log.Warn().Err(err).Str("url", norm).Msg("enqueue failed")
 				continue
