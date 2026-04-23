@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -9,8 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"Agent_Crawl/internal/application/api"
 	"Agent_Crawl/internal/application/cli"
 	"Agent_Crawl/internal/application/loader"
+	orchestration "Agent_Crawl/internal/application/orchestrator"
 	appschedule "Agent_Crawl/internal/application/schedule"
 	config "Agent_Crawl/internal/domain/config"
 	"Agent_Crawl/internal/infrastructure/discovery"
@@ -38,6 +41,7 @@ type commandOptions struct {
 	pTopic      string
 	pK          int
 	pWrite      bool
+	apiAddr     string
 	args        []string
 }
 
@@ -82,7 +86,7 @@ func main() {
 
 func parseCLI(args []string) (string, commandOptions) {
 	if len(args) < 2 {
-		fmt.Println("usage: crawler <migrate|schedule|worker|list|show|serve> --config ./config/config.yaml")
+		fmt.Println("usage: crawler <migrate|schedule|worker|list|show|serve|api> --config ./config/config.yaml")
 		os.Exit(2)
 	}
 
@@ -99,6 +103,7 @@ func parseCLI(args []string) (string, commandOptions) {
 	pTopic := fs.String("topic", "all", "filter by documents.topic_id (or all)")
 	pK := fs.Int("k", 3, "top-k classes to show")
 	pWrite := fs.Bool("write", true, "write prediction back to documents.ml_*")
+	apiAddr := fs.String("addr", ":8080", "HTTP listen address (only for api cmd)")
 	_ = fs.Parse(args[2:])
 
 	return cmd, commandOptions{
@@ -113,6 +118,7 @@ func parseCLI(args []string) (string, commandOptions) {
 		pTopic:      *pTopic,
 		pK:          *pK,
 		pWrite:      *pWrite,
+		apiAddr:     *apiAddr,
 		args:        fs.Args(),
 	}
 }
@@ -133,6 +139,50 @@ func initRuntime(ctx context.Context, configPath string) (*runtime, error) {
 }
 
 func runCommand(ctx context.Context, cmd string, opts commandOptions, rt *runtime) {
+	// HTTP API server command handled separately (does not use CLI handlers map)
+	if cmd == "api" {
+		scheduler := appschedule.NewService(
+			discovery.NewRSSDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
+			discovery.NewSitemapDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
+		)
+		afterSchedule := func(ctx context.Context) error {
+			const workerTimeout = 180 * time.Second
+
+			classes := splitCSV(opts.classesCSV)
+			if len(classes) == 0 {
+				return errors.New("classes must not be empty")
+			}
+
+			workerStep := orchestration.NewWorkerStep(rt.appCfg, rt.store, rt.store, opts.concurrency)
+			workerCtx, cancelWorker := context.WithTimeout(ctx, workerTimeout)
+			_, err := workerStep.Run(workerCtx)
+			cancelWorker()
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+				return fmt.Errorf("%s failed: %w", workerStep.Name(), err)
+			}
+
+			steps := []orchestration.Step{
+				orchestration.NewWeakLabelStep(rt.store, opts.limit),
+				orchestration.NewTrainStep(rt.store, rt.store, classes, float32(opts.minWeakConf), opts.modelName, opts.modelVer),
+				orchestration.NewSelectStep(rt.store, rt.store, opts.modelName, opts.limit, opts.batchSize),
+				orchestration.NewPredictStep(rt.store, rt.store, opts.modelName, opts.pTopic, opts.limit, opts.pWrite),
+			}
+
+			for _, step := range steps {
+				if _, err := step.Run(ctx); err != nil {
+					return fmt.Errorf("%s failed: %w", step.Name(), err)
+				}
+			}
+			return nil
+		}
+
+		srv := api.NewServer(opts.apiAddr, rt.appCfg, rt.store, rt.store, scheduler, afterSchedule)
+		if err := srv.Run(); err != nil {
+			log.Fatal().Err(err).Msg("api server failed")
+		}
+		return
+	}
+
 	handlers := cli.NewHandlers(cli.Executor{
 		AppCfg:    rt.appCfg,
 		Bootstrap: rt.store,

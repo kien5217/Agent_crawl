@@ -107,3 +107,22 @@ func (s *Store) ListUnlabeledDocs(ctx context.Context, limit int) (ids []int64, 
 func (s *Store) EnqueueLabelQueue(ctx context.Context, in model.LabelQueueItem) error {
 	return EnqueueLabelQueue(ctx, s.db, in.DocumentID, in.Reason, in.Margin)
 }
+
+func (s *Store) CreateWorkflow(ctx context.Context, wf model.WorkflowExecution) error {
+	return CreateWorkflow(ctx, s.db, wf)
+}
+func (s *Store) UpdateWorkflow(ctx context.Context, wf model.WorkflowExecution) error {
+	return UpdateWorkflow(ctx, s.db, wf)
+}
+func (s *Store) CreateStep(ctx context.Context, step model.StepExecution) error {
+	return CreateStep(ctx, s.db, step)
+}
+func (s *Store) UpdateStep(ctx context.Context, step model.StepExecution) error {
+	return UpdateStep(ctx, s.db, step)
+}
+func (s *Store) ListWorkflows(ctx context.Context, limit int) ([]model.WorkflowExecution, error) {
+	return ListWorkflows(ctx, s.db, limit)
+}
+func (s *Store) ListSteps(ctx context.Context, workflowID string) ([]model.StepExecution, error) {
+	return ListSteps(ctx, s.db, workflowID)
+}

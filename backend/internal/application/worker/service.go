@@ -40,12 +40,20 @@ func (w *Worker) Run(ctx context.Context, concurrency int) error {
 	sem := make(chan struct{}, concurrency)
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		items, err := w.q.DequeueBatch(ctx, w.cfg.Worker.BatchSize)
 		if err != nil {
 			return err
 		}
 		if len(items) == 0 {
-			time.Sleep(2 * time.Second)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(2 * time.Second):
+			}
 			continue
 		}
 

@@ -1,381 +1,262 @@
-# Agent Crawl – Project Overview & Technical Design
+﻿# Agent Crawl
 
-## 1) Mục tiêu dự án
-Agent Crawl là hệ thống crawl tin công nghệ/an toàn thông tin theo hướng **pipeline**, gồm 3 luồng chính:
-- **Discovery**: lấy URL từ RSS/Sitemap và đưa vào hàng đợi crawl.
-- **Processing**: worker tải trang, trích xuất nội dung, phân loại topic, lưu document.
-- **Learning loop**: gán nhãn yếu/gold, train model TF-IDF + Logistic Regression, chọn mẫu active learning, và ghi dự đoán ML trở lại document.
+Agent Crawl là hệ thống thu thập và xử lý nội dung theo pipeline Discovery -> Crawl/Extract -> Classification -> Learning, hiện đã tách thành hai phần:
+- backend (Go): domain logic, pipeline, API, persistence.
+- frontend (React + Vite): dashboard vận hành và quan sát workflow.
 
-Dự án áp dụng **Clean Architecture** 3 tầng (domain → application → infrastructure) để đảm bảo logic nghiệp vụ độc lập với framework và DB.
+## 1. Bức tranh kiến trúc tổng thể
 
----
+### 1.1 Context architecture
 
-## 2) Bức tranh kiến trúc tổng thể
-
-### 2.1 Các tầng kiến trúc
-
+```text
++---------------------------+         HTTP/JSON         +---------------------------+
+| Frontend (React + Vite)  | <-----------------------> | Backend API (Go net/http) |
+| - Documents UI           |                           | - /api/topics             |
+| - Workflow UI            |                           | - /api/documents          |
+| - Trigger schedule       |                           | - /api/schedule           |
++---------------------------+                           +-------------+-------------+
+                                                                      |
+                                                                      | Repository interfaces
+                                                                      v
+                                                          +-----------+------------+
+                                                          | Infrastructure (Go)    |
+                                                          | - Discovery (RSS/Site) |
+                                                          | - Fetcher/Extractor    |
+                                                          | - Classifier           |
+                                                          | - ML pipeline          |
+                                                          | - Postgres Store       |
+                                                          +-----------+------------+
+                                                                      |
+                                                                      v
+                                                          +------------------------+
+                                                          | PostgreSQL             |
+                                                          | queue, documents, ML,  |
+                                                          | workflow executions     |
+                                                          +------------------------+
 ```
+
+### 1.2 Layered architecture (backend)
+
+```text
 cmd/main.go
-    └── application/cli        ← điều phối commands, inject dependencies
-          ├── application/schedule   ← use case: orchestrate discoverers
-          ├── application/worker     ← use case: crawl + classify pipeline
-          ├── application/learning   ← use case: weak-label / train / select
-          └── application/loader     ← load config YAML
+  -> internal/application
+     -> api           (HTTP handlers + routing)
+     -> cli           (batch/ops commands)
+     -> schedule      (discovery orchestration)
+     -> worker        (crawl processing)
+     -> learning      (weak_label, train, select)
+     -> orchestrator  (workflow + step execution)
+     -> loader        (YAML config loader)
 
-domain/repository   ← interfaces (contracts) cho mọi tầng trên
-domain/model        ← data structs thuần Go
-domain/config       ← AppConfig structs
+  -> internal/domain
+     -> model         (entities)
+     -> repository    (interfaces/contracts)
+     -> config        (AppConfig)
 
-infrastructure/persistence/postgres  ← Store: implement toàn bộ repository interfaces
-infrastructure/discovery             ← RSSDiscovery, SitemapDiscovery
-infrastructure/classify              ← KeywordClassifier
-infrastructure/fetcher               ← HTTP fetcher
-infrastructure/extract               ← HTML extractor
-infrastructure/machine_learning      ← package ml: TF-IDF, LogReg, active learning
+  -> internal/infrastructure
+     -> discovery, fetcher, extract, classify, machine_learning
+     -> persistence/postgres (repository implementations)
 ```
 
-### 2.2 Cấu trúc thư mục
+### 1.3 Current workspace structure
 
-```
-cmd/
-  main.go                          entrypoint, wire dependencies
-config/
-  config.yaml                      DB, HTTP, scheduler, worker, classify, sitemap
-  topics.yaml                      taxonomy + keywords + weights
-  sources.yaml                     danh sách nguồn RSS/Sitemap
-internal/
-  domain/
-    config/AppConfig.go            AppConfig, Config, TopicsFile, SourcesFile
-    model/                         document.go, learning.go, queue.go
-    repository/repository.go       tất cả repository interfaces
-  application/
-    cli/service.go                 Executor + tất cả command handlers
-    schedule/service.go            Discoverer interface + Service (orchestration)
-    worker/service.go              Worker: dequeue → fetch → extract → persist
-    learning/
-      select_service.go            SelectBatchForLabeling, ComputeMargins
-      train_service.go             TrainFromDocs, TrainResult
-      weak_label_service.go        WeakLabeler, ApplyWeakLabels
-    loader/service.go              LoadAll: nạp 3 file YAML đồng thời
-  infrastructure/
-    persistence/postgres/
-      store.go                     Store struct, compile-time interface checks
-      bootstrap.go / queue.go / documents.go / learning.go / migrate.go / connect.go
-    discovery/
-      rss.go                       RSSDiscovery (implements schedule.Discoverer)
-      sitemap.go                   SitemapDiscovery (implements schedule.Discoverer)
-      normalize.go                 URL canonicalization
-      cve_filter.go                CVE pattern filter
-    classify/classify.go           KeywordClassifier (rule-based)
-    fetcher/fetcher.go             HTTP fetch với timeout/max-bytes
-    extract/extract.go             HTML → article (title/content/author/date)
-    machine_learning/              package ml – tất cả ML trong 1 package
-      tfidf_vectorizer.go          Vectorizer, SparseVector, TokenizeUnigram
-      logistic_regression.go       Model, NewModel, SGDStep, TrainSGD
-      batch_balanced.go            SelectBatchBalanced (margin + diversity)
-      model_bundle_codec.go        Bundle{Vectorizer, Model}, Marshal/Unmarshal
-  platform/
-    text_util.go                   tiện ích text
-    timeparse_util.go              tiện ích parse time
-migrations/
-  001_init.up.sql
-  002_learning.up.sql
-  003_documents_ml.up.sql
+```text
+Agent_Crawl/
+  backend/
+    cmd/
+    config/
+    internal/
+    migrations/
+    go.mod
+    go.sum
+  frontend/
+    src/
+    package.json
+    vite.config.ts
+  README.md
 ```
 
-### 2.3 Dependency injection
+### 1.4 Runtime topology
 
-`cmd/main.go` khởi tạo `postgres.Store` duy nhất, sau đó inject vào `cli.Executor` qua các repository interfaces:
+- Backend service chạy bằng lệnh api command, expose HTTP API và phục vụ static frontend build từ ../frontend/dist.
+- Frontend dev mode chạy Vite tại localhost:5173, proxy /api về localhost:8080.
+- Data plane tập trung ở PostgreSQL.
 
-```
-postgres.Store
-  → BootstrapRepository  → cli.Executor.Bootstrap
-  → MigrationRepository  → cli.Executor.Migrate
-  → QueueRepository      → schedule.Service (via Discoverer) + worker.Worker
-  → CrawlWriteRepository → worker.Worker
-  → DocumentRepository   → cli.Executor.Document
-  → LearningRepository   → cli.Executor.Learning
-  → ModelRepository      → cli.Executor.Model
-```
+## 2. Technical design chi tiết
 
-Application code không có import nào từ `pgx` hay bất kỳ package infrastructure nào (ngoại trừ `machine_learning` trong `application/learning`).
+### 2.1 Backend composition
 
----
+#### Entrypoint và dependency wiring
+- File: backend/cmd/main.go
+- Chịu trách nhiệm:
+  - Parse command-line options.
+  - Load config YAML (config.yaml, topics.yaml, sources.yaml).
+  - Open DB connection.
+  - Wire postgres.Store vào các repository interfaces.
+  - Chạy command tương ứng: migrate, schedule, worker, list, show, weak_label, train, select, predict, api.
 
-## 3) Technical design chi tiết
+#### API module
+- Files:
+  - backend/internal/application/api/server.go
+  - backend/internal/application/api/handlers.go
+- Routing hiện có:
+  - GET /api/topics
+  - GET /api/documents?topic=&limit=
+  - GET /api/documents/{id}
+  - POST /api/schedule
+  - GET /api/workflows?limit=
+  - GET /api/workflows/{id}/steps
+- CORS: allow all origin cho local dev.
+- Static serve: route / trỏ tới ../frontend/dist.
 
-### 3.1 Config & bootstrap
-Hệ thống nạp đồng thời 3 file YAML qua `application/loader`:
-1. `config/config.yaml` (DB, HTTP, scheduler, worker, classify, sitemap)
-2. `config/topics.yaml` (taxonomy + keyword + weight)
-3. `config/sources.yaml` (danh sách nguồn RSS/Sitemap)
+#### Schedule -> Learning orchestration qua API
+- POST /api/schedule không chỉ discovery.
+- Sau khi discovery thành công, backend chạy post-schedule pipeline:
+  1. Worker step (timeout 180s).
+  2. WeakLabel step.
+  3. Train step.
+  4. Select step.
+  5. Predict step.
+- Mục tiêu: 1 nút Run Schedule ở frontend có thể kích hoạt full cycle.
 
-`database_url` hỗ trợ biến môi trường (`os.ExpandEnv`).
+### 2.2 Domain and repositories
 
-### 3.2 Discovery & Schedule design
+- Domain models: document, learning, queue, workflow.
+- Repository contracts đặt tại backend/internal/domain/repository/repository.go.
+- postgres.Store implement các contracts:
+  - BootstrapRepository
+  - QueueRepository
+  - DocumentRepository
+  - CrawlWriteRepository
+  - LearningRepository
+  - ModelRepository
+  - MigrationRepository
+  - WorkflowRepository
 
-`application/schedule.Service` định nghĩa interface `Discoverer`:
-```go
-type Discoverer interface {
-    Name() string
-    Enqueue(ctx context.Context) (int, error)
-}
-```
+### 2.3 Discovery design
 
-Cả `RSSDiscovery` và `SitemapDiscovery` implement interface này. `Service.Run()` gọi tuần tự từng discoverer và tổng hợp kết quả.
+- Discovery sources gồm RSS và Sitemap.
+- URL normalize trước khi enqueue.
+- Topic filtering theo source/topic config và heuristic theo từng nhóm topic.
+- Output của discovery ghi vào crawl_queue với priority.
 
-#### RSS discovery
-- Duyệt qua source `enabled` có `rss_url`.
-- Parse feed bằng `gofeed`.
-- Match topic theo `source.topic_ids`; `cve` vẫn có heuristic riêng mạnh hơn.
-- URL được normalize trước khi enqueue.
-- Enqueue với priority `10`.
+### 2.4 Worker design
 
-#### Sitemap discovery
-- Chỉ chạy khi `sitemap.enabled = true`.
-- Hỗ trợ cả `sitemapindex` lẫn `urlset`.
-- Giới hạn depth recursion, max child sitemap, max URLs per source.
-- Match URL theo `source.topic_ids`; `cve` vẫn dùng thêm heuristic URL.
-- Enqueue với priority `0`.
+Pipeline mỗi queue item:
+1. Dequeue batch từ DB (lock-safe).
+2. Fetch HTML.
+3. Extract title/content/metadata.
+4. Rule-based classify.
+5. Quality gate nội dung.
+6. Upsert documents.
+7. Mark done/fail và retry theo policy.
 
-### 3.3 Queue & worker processing
+### 2.5 Learning/ML design
 
-#### Queue model
-`crawl_queue` dùng trạng thái enum: `pending` → `processing` → `done`.  
-Lỗi thì tăng `attempts`, set `next_run_at`, quay lại `pending` hoặc `failed` nếu vượt ngưỡng.
+ML stack (backend/internal/infrastructure/machine_learning):
+- TF-IDF vectorizer.
+- Logistic Regression.
+- Model bundle codec.
+- Batch selection cân bằng cho active learning.
 
-`DequeueBatch` dùng transaction + `FOR UPDATE SKIP LOCKED` để an toàn khi nhiều worker chạy đồng thời.
+Use-cases learning:
+- weak_label: sinh nhãn yếu cho tài liệu chưa gán.
+- train: train model từ gold + weak labels theo confidence threshold.
+- select: chọn mẫu uncertain/diverse cho label_queue.
+- predict: ghi ml_topic/ml_confidence/ml_scores trở lại documents.
 
-#### Worker flow (`application/worker.Worker`)
-- Poll queue liên tục (sleep 2s khi rỗng).
-- Xử lý song song với semaphore (`concurrency` từ CLI).
-- Mỗi URL:
-  1. Fetch HTML
-  2. Extract metadata + content text
-  3. Classify bằng keyword score
-  4. Quality gate: content ≥ 200 ký tự, title không rỗng
-  5. Upsert vào `documents` theo `canonical_url`
-  6. Mark queue done / fail
+### 2.6 Workflow persistence
 
-### 3.4 Extraction strategy
-Extractor ưu tiên metadata standards:
-- canonical: `<link rel="canonical">`, `og:url`, fallback URL gốc
-- title: `og:title`, `<title>`, `<h1>`
-- author: `meta[name=author]`, `article:author`
-- published_time: article metadata hoặc `time[datetime]`
+- Workflow executions và step executions được lưu DB.
+- API frontend có thể truy vấn list workflows và step logs để theo dõi quá trình chạy.
 
-Content extraction ưu tiên selector phổ biến (`article`, `.post-content`, ...) rồi fallback `body`.
+### 2.7 Frontend design
 
-### 3.5 Classification strategy (rule-based)
-- Chuẩn hóa text trước khi match.
-- Điểm keyword trong title được nhân hệ số 3.
-- Điểm keyword trong body giữ nguyên trọng số.
-- Topic có điểm cao nhất thắng; thấp hơn `min_score_to_accept` thì trả `unknown`.
+- Framework: React + TypeScript + Vite.
+- Main modules:
+  - Documents page: list/filter/detail, trigger schedule.
+  - Topics page: taxonomy view.
+  - Workflows page: lịch sử execution.
+  - Workflow steps page: logs theo workflow.
+- API client tách riêng trong frontend/src/api/client.ts.
 
-### 3.6 Learning + ML design
+### 2.8 Security/operations notes (Windows Application Control)
 
-Tất cả ML nằm trong `package ml` (`infrastructure/machine_learning/`):
-- **`tfidf_vectorizer.go`**: `Vectorizer.Fit()` + `Transform()` → `SparseVector` (L2-normalized).
-- **`logistic_regression.go`**: `Model.TrainSGD()` với SGD + L2 regularization.
-- **`batch_balanced.go`**: `SelectBatchBalanced()` – chọn mẫu theo margin uncertainty + cosine diversity.
-- **`model_bundle_codec.go`**: `Bundle{Vectorizer, Model}` – marshal/unmarshal JSON.
+Trong môi trường có AppLocker/WDAC:
+- Có thể bị chặn go run ./cmd do Go tạo binary tạm trong AppData.
+- Có thể bị chặn native Node addon (rollup.win32-x64-msvc.node).
 
-#### Weak labeling (`application/learning`)
-- Lấy docs chưa có weak label.
-- Áp dụng rule để sinh `(topic, confidence, rule_id)`.
-- Upsert vào `labels_weak`.
-
-#### Training set assembly
-- Ưu tiên `labels_gold`.
-- Fallback `labels_weak` với `confidence >= minWeakConf`.
-
-#### Model training
-- Vectorizer: TF-IDF với `minDF` configurable.
-- Classifier: multi-class logistic regression (softmax) train bằng SGD.
-- Model bundle (vectorizer + weights) lưu nhị phân vào bảng `models`.
-
-#### Active learning selection
-- Load latest model.
-- Predict trên tập unlabeled.
-- Chọn batch theo uncertainty margin + cosine diversity.
-- Ghi vào `label_queue` cho quy trình gán nhãn thủ công.
-
-#### Prediction write-back
-Command `predict` ghi ngược vào `documents.ml_*`:
-- `ml_topic_id`, `ml_confidence`, `ml_scores`, `ml_model_name`, `ml_model_version`, `ml_predicted_at`.
-
----
-
-## 4) Data model (PostgreSQL)
-
-### 4.1 Core tables
-- `topics`: metadata topic + keyword json.
-- `sources`: metadata nguồn crawl.
-- `crawl_queue`: task queue URL crawl.
-- `documents`: dữ liệu bài viết đã xử lý.
-
-### 4.2 Learning tables
-- `labels_weak`: nhãn yếu theo rules.
-- `labels_gold`: nhãn thật (human-labeled).
-- `models`: versioned model artifact.
-- `label_queue`: hàng đợi gợi ý mẫu để gán nhãn.
-
-### 4.3 ML columns trên documents
-- `ml_topic_id`, `ml_confidence`, `ml_scores`, `ml_model_name`, `ml_model_version`, `ml_predicted_at`.
-
----
-
-## 5) Sequence diagrams
-
-### 5.1 Discovery (`schedule`)
-```mermaid
-sequenceDiagram
-    autonumber
-    participant CLI as cli.Executor
-    participant SVC as schedule.Service
-    participant RSS as RSSDiscovery
-    participant SM as SitemapDiscovery
-    participant DB as PostgreSQL
-
-    CLI->>SVC: Run(ctx)
-    SVC->>RSS: Name() + Enqueue(ctx)
-    loop each enabled source.rss_url
-      RSS->>RSS: fetchFeed + parse + CVE text filter
-      RSS->>DB: EnqueueURL(priority=10)
-    end
-    SVC->>SM: Name() + Enqueue(ctx)
-    loop each enabled source.sitemap_urls
-      SM->>SM: processSitemapAny(recursive)
-      SM->>DB: EnqueueURL(priority=0)
-    end
-    SVC-->>CLI: Result{Counts: {"rss": n, "sitemap": m}}
-```
-
-### 5.2 Worker (`worker`)
-```mermaid
-sequenceDiagram
-    autonumber
-    participant CLI as cli.Executor
-    participant W as worker.Worker
-    participant Q as QueueRepository
-    participant F as Fetcher
-    participant E as Extractor
-    participant C as KeywordClassifier
-    participant D as CrawlWriteRepository
-
-    CLI->>W: Run(concurrency)
-    loop polling
-      W->>Q: DequeueBatch(FOR UPDATE SKIP LOCKED)
-      alt queue empty
-        W-->>W: sleep 2s
-      else has items
-        par each item
-          W->>F: HTTP GET URL
-          F-->>W: HTML body
-          W->>E: FromHTML()
-          E-->>W: title/content/meta
-          W->>C: Classify(title, content)
-          C-->>W: topic + scores
-          alt content invalid
-            W->>Q: MarkFailed(attempt++, next_run_at)
-          else valid
-            W->>D: INSERT/UPDATE by canonical_url
-            W->>Q: MarkDone()
-          end
-        end
-      end
-    end
-```
-
-### 5.3 Learning loop
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as Operator/Labeler
-    participant CLI as main.go (weak_label/train/select/predict)
-    participant DB as PostgreSQL
-    participant ML as TF-IDF + Logistic Regression
-
-    U->>CLI: weak_label
-    CLI->>DB: ListDocsForWeakLabel
-    CLI->>DB: UpsertWeakLabel
-
-    U->>CLI: train
-    CLI->>DB: ListTrainingSet(gold + weak>=threshold)
-    CLI->>ML: TrainFromDocs
-    CLI->>DB: SaveModel(name, version)
-
-    U->>CLI: select
-    CLI->>DB: LoadLatestModel + ListUnlabeledDocs
-    CLI->>ML: SelectBatchForLabeling
-    CLI->>DB: EnqueueLabelQueue
-
-    U->>CLI: predict
-    CLI->>DB: LoadLatestModel + ListDocuments
-    CLI->>ML: PredictProba
-    CLI->>DB: UpdateDocumentML (optional write-back)
-```
-
----
-
-## 6) Feature matrix (hiện có)
-
-- ✅ Crawl từ **RSS** và **Sitemap**.
-- ✅ Lọc domain/CVE pattern trước khi enqueue.
-- ✅ Queue retry với `attempts`, `backoff`, `max_attempts`.
-- ✅ Extract metadata + nội dung text từ HTML.
-- ✅ Classify keyword-based theo taxonomy configurable.
-- ✅ Dedupe theo canonical URL và hash content.
-- ✅ Learning pipeline: weak labels, gold labels, train model, select active learning, predict + write-back.
-- ✅ CLI vận hành đủ vòng đời dữ liệu.
-
----
-
-## 7) Non-functional design notes
-
-- **Idempotency**: queue và documents có unique index chống trùng.
-- **Concurrency safety**: dequeue dùng transaction lock + skip locked.
-- **Resilience**: retry/backoff khi fetch/extract/db fail.
-- **Observability**: structured logging qua `zerolog`.
-- **Performance controls**:
-  - HTTP timeout/max bytes
-  - giới hạn enqueue theo source/sitemap
-  - batch size và worker concurrency.
-
----
-
-## 8) Các điểm cần cải tiến (đề xuất)
-
-1. **Tách role service**: scheduler/worker/api thành process độc lập.
-2. **Bổ sung metrics**: Prometheus (queue lag, success rate, retry rate, extraction quality).
-3. **Index tuning**: thêm index theo `status, attempts, next_run_at` cho queue lớn.
-4. **Content quality scoring**: lọc boilerplate tốt hơn bằng heuristic/Readability.
-5. **Model serving**: endpoint inference thay vì chỉ qua CLI.
-6. **Labeling UI**: web UI cho `label_queue` + audit trail.
-7. **Testing**: unit/integration tests cho discovery/extract/worker/db migrations.
-
----
-
-## 9) Runbook nhanh
+Khuyến nghị run commands:
 
 ```bash
-# migrate schema + upsert topics/sources
-go run ./cmd/main.go migrate --config ./config/config.yaml
+# Backend (policy-friendly)
+cd backend
+go run ./cmd/main.go api --config ./config/config.yaml --addr :8080
 
-# schedule URL từ RSS + sitemap
-go run ./cmd/main.go schedule --config ./config/config.yaml
+# Hoặc build binary cố định
+cd backend
+go build -o ./bin/agent-crawl.exe ./cmd
+./bin/agent-crawl.exe api --config ./config/config.yaml --addr :8080
 
-# chạy worker crawl + classify
-go run ./cmd/main.go worker --config ./config/config.yaml --concurrency 20
-
-# xem docs theo topic
-go run ./cmd/main.go list cve 100 --config ./config/config.yaml
-
-# huấn luyện vòng ML
-go run ./cmd/main.go weak_label --config ./config/config.yaml --limit 5000
-go run ./cmd/main.go train --config ./config/config.yaml --model-name tfidf_lr --classes "cve,malware,patch,threat"
-go run ./cmd/main.go select --config ./config/config.yaml --batch 50 --model-name tfidf_lr
-go run ./cmd/main.go predict --config ./config/config.yaml --topic all --limit 5000 --write true --model-name tfidf_lr
+# Frontend
+cd frontend
+npm install
+npm run dev
 ```
 
+## 3. Feature matrix hiện có
 
+| Domain | Feature | Status | Notes |
+|---|---|---|---|
+| Discovery | RSS discovery | Done | Enqueue URL từ RSS sources |
+| Discovery | Sitemap discovery | Done | Hỗ trợ sitemap/urlset, giới hạn theo config |
+| Queue | Retry/backoff | Done | attempts + next_run_at + max attempts |
+| Processing | HTML fetch + extract | Done | Trích xuất title/content/metadata |
+| Processing | Rule-based topic classification | Done | Dựa trên topics/keywords config |
+| Persistence | Upsert document + dedupe | Done | Theo canonical URL/content hash |
+| Learning | Weak labeling | Done | labels_weak pipeline |
+| Learning | Model training | Done | TF-IDF + Logistic Regression |
+| Learning | Active learning selection | Done | Chọn batch cho label queue |
+| Learning | Prediction write-back | Done | Cập nhật ml_* columns trên documents |
+| Workflow | Workflow execution persistence | Done | Lưu workflow/steps vào DB |
+| API | Document/topic/workflow endpoints | Done | Expose qua net/http mux |
+| API | Trigger full schedule pipeline | Done | POST /api/schedule có post-schedule steps |
+| Frontend | Documents dashboard | Done | List/filter/detail + run schedule |
+| Frontend | Workflow monitor UI | Done | Workflow list + steps |
+| Frontend | Topics UI | Done | Danh sách taxonomy |
+| Deployment | Serve frontend dist từ backend | Done | Route / -> ../frontend/dist |
+
+## 4. Roadmap ngắn hạn
+
+- Thêm auth/authz cho API trước khi public deployment.
+- Bổ sung metrics và health endpoints (queue lag, success rate, step duration).
+- Tối ưu hóa observability: trace theo workflow_id.
+- Bổ sung integration tests cho API và orchestrator pipeline.
+- Tách scheduler và worker thành process độc lập nếu cần scale lớn.
+
+## 5. Quick start
+
+### 5.1 Backend
+
+```bash
+cd backend
+go run ./cmd/main.go migrate --config ./config/config.yaml
+go run ./cmd/main.go api --config ./config/config.yaml --addr :8080
+```
+
+### 5.2 Frontend (dev)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 5.3 Frontend production build
+
+```bash
+cd frontend
+npm run build
+```
+
+Sau khi build, backend sẽ phục vụ nội dung từ frontend/dist qua route /.

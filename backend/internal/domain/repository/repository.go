@@ -47,3 +47,23 @@ type ModelRepository interface {
 type MigrationRepository interface {
 	Migrate(ctx context.Context, migrationsDir string) error
 }
+
+type WorkflowRepository interface {
+	// Tạo mới một workflow execution (khi bắt đầu chạy)
+	CreateWorkflow(ctx context.Context, wf model.WorkflowExecution) error
+
+	// Cập nhật status/kết quả của workflow (khi xong/fail/halt)
+	UpdateWorkflow(ctx context.Context, wf model.WorkflowExecution) error
+
+	// Tạo mới một step execution
+	CreateStep(ctx context.Context, step model.StepExecution) error
+
+	// Cập nhật step khi bắt đầu chạy, thành công, hoặc thất bại
+	UpdateStep(ctx context.Context, step model.StepExecution) error
+
+	// Lấy danh sách workflow gần đây (cho lệnh `workflow list`)
+	ListWorkflows(ctx context.Context, limit int) ([]model.WorkflowExecution, error)
+
+	// Lấy tất cả steps của một workflow (cho lệnh `workflow logs`)
+	ListSteps(ctx context.Context, workflowID string) ([]model.StepExecution, error)
+}
