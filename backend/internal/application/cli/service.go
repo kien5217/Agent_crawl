@@ -117,7 +117,7 @@ func (e Executor) handleList(ctx context.Context, opts Options) {
 		}
 	}
 
-	docs, err := e.Document.ListDocuments(ctx, topic, limit)
+	docs, err := e.Document.ListDocuments(ctx, repository.DocumentListFilter{TopicID: topic, Limit: limit})
 	if err != nil {
 		log.Fatal().Err(err).Msg("list failed")
 	}
@@ -264,7 +264,7 @@ func (e Executor) handlePredict(ctx context.Context, opts Options) {
 		log.Fatal().Err(err).Msg("predict: unmarshal model failed")
 	}
 
-	docs, err := e.Document.ListDocuments(ctx, opts.PTopic, opts.Limit)
+	docs, err := e.Document.ListDocuments(ctx, repository.DocumentListFilter{TopicID: opts.PTopic, Limit: opts.Limit})
 	if err != nil {
 		log.Fatal().Err(err).Msg("predict: list documents failed")
 	}

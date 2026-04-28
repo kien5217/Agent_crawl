@@ -99,6 +99,7 @@ Agent_Crawl/
 - Files:
   - backend/internal/application/api/server.go
   - backend/internal/application/api/handlers.go
+  - backend/internal/application/api/auth.go
 - Routing hiện có:
   - GET /api/topics
   - GET /api/documents?topic=&limit=
@@ -108,6 +109,9 @@ Agent_Crawl/
   - GET /api/workflows/{id}/steps
 - CORS: allow all origin cho local dev.
 - Static serve: route / trỏ tới ../frontend/dist.
+- Auth: endpoint ghi dữ liệu `POST /api/schedule` yêu cầu một trong hai cơ chế:
+  - `X-API-Key: <value>` khớp `auth.api_key` trong `config.yaml`.
+  - `Authorization: Bearer <jwt>` với JWT ký `HS256` bằng `auth.jwt_secret`.
 
 #### Schedule -> Learning orchestration qua API
 - POST /api/schedule không chỉ discovery.
@@ -221,6 +225,7 @@ npm run dev
 | Workflow | Workflow execution persistence | Done | Lưu workflow/steps vào DB |
 | API | Document/topic/workflow endpoints | Done | Expose qua net/http mux |
 | API | Trigger full schedule pipeline | Done | POST /api/schedule có post-schedule steps |
+| API | Write auth (API key/JWT) | Done | POST /api/schedule chặn unauthorized |
 | Frontend | Documents dashboard | Done | List/filter/detail + run schedule |
 | Frontend | Workflow monitor UI | Done | Workflow list + steps |
 | Frontend | Topics UI | Done | Danh sách taxonomy |
@@ -240,8 +245,17 @@ npm run dev
 
 ```bash
 cd backend
+set API_KEY=local-dev-key
+# optional if bạn muốn dùng JWT thay vì API key
+set JWT_SECRET=replace-this-with-long-secret
 go run ./cmd/main.go migrate --config ./config/config.yaml
 go run ./cmd/main.go api --config ./config/config.yaml --addr :8080
+```
+
+Ví dụ trigger schedule với API key:
+
+```bash
+curl -X POST http://localhost:8080/api/schedule -H "X-API-Key: local-dev-key"
 ```
 
 ### 5.2 Frontend (dev)
@@ -249,6 +263,10 @@ go run ./cmd/main.go api --config ./config/config.yaml --addr :8080
 ```bash
 cd frontend
 npm install
+# optional nếu muốn nút Run Schedule gửi auth header
+set VITE_API_KEY=local-dev-key
+# hoặc
+set VITE_API_BEARER_TOKEN=<jwt-token>
 npm run dev
 ```
 

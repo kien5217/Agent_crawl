@@ -130,6 +130,8 @@ func initRuntime(ctx context.Context, configPath string) (*runtime, error) {
 	}
 
 	databaseURL := os.ExpandEnv(appCfg.Config.DatabaseURL)
+	appCfg.Config.Auth.APIKey = os.ExpandEnv(appCfg.Config.Auth.APIKey)
+	appCfg.Config.Auth.JWTSecret = os.ExpandEnv(appCfg.Config.Auth.JWTSecret)
 	db, err := postgres.Open(ctx, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
@@ -176,7 +178,7 @@ func runCommand(ctx context.Context, cmd string, opts commandOptions, rt *runtim
 			return nil
 		}
 
-		srv := api.NewServer(opts.apiAddr, rt.appCfg, rt.store, rt.store, scheduler, afterSchedule)
+		srv := api.NewServer(opts.apiAddr, rt.appCfg, rt.store, rt.store, rt.store, scheduler, afterSchedule)
 		if err := srv.Run(); err != nil {
 			log.Fatal().Err(err).Msg("api server failed")
 		}

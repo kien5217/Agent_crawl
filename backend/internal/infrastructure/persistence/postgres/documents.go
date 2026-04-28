@@ -4,19 +4,54 @@ import (
 	"context"
 
 	"Agent_Crawl/internal/domain/model"
+	"Agent_Crawl/internal/domain/repository"
+
+	"github.com/jackc/pgx/v5"
 )
 
-func ListDocuments(ctx context.Context, db DB, topicID string, limit int) ([]model.Document, error) {
-	if limit <= 0 || limit > 200 {
+func ListDocuments(ctx context.Context, db DB, filter repository.DocumentListFilter) ([]model.Document, error) {
+	topicID := filter.TopicID
+	sourceID := filter.SourceID
+	limit := filter.Limit
+	if limit < 0 {
 		limit = 50
 	}
-	rows, err := db.Query(ctx, `
+	if limit > 200 {
+		limit = 50
+	}
+
+	var fromDate any
+	if filter.FromDate != nil {
+		fromDate = *filter.FromDate
+	}
+
+	var toDate any
+	if filter.ToDate != nil {
+		toDate = *filter.ToDate
+	}
+
+	var mlConfidenceMin any
+	if filter.MLConfidenceMin != nil {
+		mlConfidenceMin = *filter.MLConfidenceMin
+	}
+
+	query := `
 		SELECT id, title, url, canonical_url, topic_id, published_at, content_text, source_id
 		FROM documents
 		WHERE ($1 = '' OR $1 = 'all' OR topic_id = $1)
-		ORDER BY COALESCE(published_at, created_at) DESC
-		LIMIT $2
-	`, topicID, limit)
+		  AND ($2 = '' OR $2 = 'all' OR source_id = $2)
+		  AND ($3::timestamptz IS NULL OR COALESCE(published_at, created_at) >= $3::timestamptz)
+		  AND ($4::timestamptz IS NULL OR COALESCE(published_at, created_at) <= $4::timestamptz)
+		  AND ($5::real IS NULL OR ml_confidence >= $5::real)
+		ORDER BY COALESCE(published_at, created_at) DESC`
+
+	var rows pgx.Rows
+	var err error
+	if limit == 0 {
+		rows, err = db.Query(ctx, query, topicID, sourceID, fromDate, toDate, mlConfidenceMin)
+	} else {
+		rows, err = db.Query(ctx, query+` LIMIT $6`, topicID, sourceID, fromDate, toDate, mlConfidenceMin, limit)
+	}
 	if err != nil {
 		return nil, err
 	}

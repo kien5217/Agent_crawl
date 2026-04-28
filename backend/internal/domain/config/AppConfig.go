@@ -9,6 +9,11 @@ type AppConfig struct {
 type Config struct {
 	DatabaseURL string `yaml:"database_url"`
 
+	Auth struct {
+		APIKey    string `yaml:"api_key"`
+		JWTSecret string `yaml:"jwt_secret"`
+	} `yaml:"auth"`
+
 	HTTP struct {
 		TimeoutSeconds int    `yaml:"timeout_seconds"`
 		UserAgent      string `yaml:"user_agent"`
@@ -65,4 +70,12 @@ type Source struct {
 	SitemapURLs []string `yaml:"sitemap_urls"`
 	TopicIDs    []string `yaml:"topic_ids"`
 	Enabled     bool     `yaml:"enabled"`
+
+	// ExcludeChildSitemapPatterns: skip child sitemaps whose URL contains any of these substrings.
+	// Useful for filtering out category/tag/author/page sitemaps.
+	ExcludeChildSitemapPatterns []string `yaml:"exclude_child_sitemap_patterns"`
+
+	// SitemapMinLastmod: skip child sitemaps last-modified before this date (RFC3339 or YYYY-MM-DD).
+	// Useful for ignoring old archive sitemaps.
+	SitemapMinLastmod string `yaml:"sitemap_min_lastmod"`
 }

@@ -10,8 +10,27 @@
 }
 
 .filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: flex-end;
   margin-bottom: 16px;
   font-size: 0.95rem;
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.filterField span {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .filters select {
@@ -19,6 +38,18 @@
   border-radius: 4px;
   border: 1px solid #cbd5e1;
   font-size: 0.95rem;
+}
+
+.filters input {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.filterActions {
+  display: flex;
+  gap: 8px;
 }
 
 .table {
@@ -75,6 +106,21 @@
   cursor: not-allowed;
 }
 
+.btnSecondary {
+  padding: 8px 16px;
+  background: #e2e8f0;
+  color: #334155;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btnSecondary:hover {
+  background: #cbd5e1;
+}
+
 .muted {
   color: #94a3b8;
   margin-top: 16px;
@@ -124,4 +170,14 @@
   border: 1px solid #e2e8f0;
   max-height: 60vh;
   overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .filterField {
+    min-width: 100%;
+  }
+
+  .filterActions {
+    width: 100%;
+  }
 }

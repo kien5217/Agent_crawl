@@ -19,7 +19,7 @@ export default function WorkflowsPage() {
   useEffect(() => {
     api
       .listWorkflows()
-      .then(setWorkflows)
+      .then((data) => setWorkflows(Array.isArray(data) ? data : []))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])

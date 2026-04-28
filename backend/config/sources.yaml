@@ -56,3 +56,9 @@ sources:
     - "https://www.securityweek.com/sitemap.xml"
     topic_ids: ["cve", "security", "cloud"]
     enabled: true
+    exclude_child_sitemap_patterns:
+      - "category-sitemap"
+      - "post_tag-sitemap"
+      - "author-sitemap"
+      - "page-sitemap"
+    sitemap_min_lastmod: "2024-01-01"

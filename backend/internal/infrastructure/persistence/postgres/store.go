@@ -26,6 +26,7 @@ var _ repository.DocumentRepository = (*Store)(nil)
 var _ repository.CrawlWriteRepository = (*Store)(nil)
 var _ repository.LearningRepository = (*Store)(nil)
 var _ repository.ModelRepository = (*Store)(nil)
+var _ repository.HealthRepository = (*Store)(nil)
 
 func (s *Store) Migrate(ctx context.Context, migrationsDir string) error {
 	return Migrate(ctx, s.db, migrationsDir)
@@ -55,8 +56,8 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, maxAttempts int, nextR
 	return MarkFailed(ctx, s.db, id, maxAttempts, nextRunAt, lastErr)
 }
 
-func (s *Store) ListDocuments(ctx context.Context, topicID string, limit int) ([]model.Document, error) {
-	return ListDocuments(ctx, s.db, topicID, limit)
+func (s *Store) ListDocuments(ctx context.Context, filter repository.DocumentListFilter) ([]model.Document, error) {
+	return ListDocuments(ctx, s.db, filter)
 }
 
 func (s *Store) GetDocumentByID(ctx context.Context, id int64) (*model.Document, error) {
@@ -125,4 +126,8 @@ func (s *Store) ListWorkflows(ctx context.Context, limit int) ([]model.WorkflowE
 }
 func (s *Store) ListSteps(ctx context.Context, workflowID string) ([]model.StepExecution, error) {
 	return ListSteps(ctx, s.db, workflowID)
+}
+
+func (s *Store) GetHealthStats(ctx context.Context) (model.HealthStats, error) {
+	return GetHealthStats(ctx, s.db)
 }

@@ -38,3 +38,9 @@ export interface StepExecution {
 export interface ScheduleResult {
   Counts: Record<string, number>
 }
+
+export interface HealthStats {
+  queue_size: number
+  last_crawl_time: string | null
+  source_fail_count: number
+}

@@ -5,6 +5,7 @@ import DocumentDetailPage from './pages/DocumentDetailPage'
 import TopicsPage from './pages/TopicsPage'
 import WorkflowsPage from './pages/WorkflowsPage'
 import WorkflowStepsPage from './pages/WorkflowStepsPage'
+import HealthPage from './pages/HealthPage'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="topics" element={<TopicsPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="workflows/:id/steps" element={<WorkflowStepsPage />} />
+          <Route path="health" element={<HealthPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

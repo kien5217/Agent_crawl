@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
+
+	"Agent_Crawl/internal/domain/repository"
 
 	"github.com/rs/zerolog/log"
 )
@@ -38,27 +42,88 @@ func (s *Server) handleListTopics(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleListDocuments returns a paginated list of documents.
-//
-//	GET /api/documents?topic=<id>&limit=<n>
+// GET /api/documents?topic=<id>&source=<id>&from_date=<date>&to_date=<date>&ml_confidence_min=<v>&limit=<n>
 func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
 	topic := r.URL.Query().Get("topic")
 	if topic == "" {
 		topic = "all"
 	}
+
+	source := strings.TrimSpace(r.URL.Query().Get("source"))
+	fromDate, err := parseDateQuery(r.URL.Query().Get("from_date"), false)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid from_date (use RFC3339 or YYYY-MM-DD)")
+		return
+	}
+	toDate, err := parseDateQuery(r.URL.Query().Get("to_date"), true)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid to_date (use RFC3339 or YYYY-MM-DD)")
+		return
+	}
+
+	var mlConfMin *float32
+	if raw := strings.TrimSpace(r.URL.Query().Get("ml_confidence_min")); raw != "" {
+		v, err := strconv.ParseFloat(raw, 32)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid ml_confidence_min")
+			return
+		}
+		fv := float32(v)
+		mlConfMin = &fv
+	}
+
+	rawLimit := strings.TrimSpace(r.URL.Query().Get("limit"))
 	limit := 50
-	if l := r.URL.Query().Get("limit"); l != "" {
-		if n, err := strconv.Atoi(l); err == nil && n > 0 {
-			limit = n
+	hasAnyFilter := topic != "all" || source != "" || fromDate != nil || toDate != nil || mlConfMin != nil
+	if rawLimit == "" && hasAnyFilter {
+		// Filtered queries default to full result set unless caller explicitly sets limit.
+		limit = 0
+	}
+	if rawLimit != "" {
+		n, err := strconv.Atoi(rawLimit)
+		if err == nil {
+			if n == 0 {
+				limit = 0
+			} else if n > 0 {
+				limit = n
+			}
 		}
 	}
 
-	docs, err := s.document.ListDocuments(r.Context(), topic, limit)
+	docs, err := s.document.ListDocuments(r.Context(), repository.DocumentListFilter{
+		TopicID:         topic,
+		SourceID:        source,
+		FromDate:        fromDate,
+		ToDate:          toDate,
+		MLConfidenceMin: mlConfMin,
+		Limit:           limit,
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("handleListDocuments")
 		writeError(w, http.StatusInternalServerError, "failed to list documents")
 		return
 	}
 	writeJSON(w, http.StatusOK, docs)
+}
+
+func parseDateQuery(raw string, endOfDay bool) (*time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return &t, nil
+	}
+
+	t, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		return nil, err
+	}
+	if endOfDay {
+		t = t.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
+	return &t, nil
 }
 
 // handleGetDocument returns a single document by ID.
@@ -143,4 +208,17 @@ func (s *Server) handleListSteps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, steps)
+}
+
+// handleGetHealth returns quality-of-service metrics for the crawl pipeline.
+//
+//	GET /api/health
+func (s *Server) handleGetHealth(w http.ResponseWriter, r *http.Request) {
+	stats, err := s.health.GetHealthStats(r.Context())
+	if err != nil {
+		log.Error().Err(err).Msg("handleGetHealth")
+		writeError(w, http.StatusInternalServerError, "failed to get health stats")
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
 }

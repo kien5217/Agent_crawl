@@ -1,5 +1,9 @@
 database_url: "postgresql://postgres:postgres@localhost:5432/postgres"
 
+auth:
+  api_key: "${API_KEY}"
+  jwt_secret: "${JWT_SECRET}"
+
 http:
   timeout_seconds: 20
   user_agent: "tech-crawler/0.1 (+local MVP)"

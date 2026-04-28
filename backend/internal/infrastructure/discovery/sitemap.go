@@ -113,6 +113,8 @@ func (d *SitemapDiscovery) processSitemapAny(ctx context.Context, s config.Sourc
 			maxChildren = 200
 		}
 
+		minLastmod := parseSitemapDate(s.SitemapMinLastmod)
+
 		added := 0
 		for i, child := range idx.Sitemaps {
 			if i >= maxChildren || added >= remaining {
@@ -120,6 +122,10 @@ func (d *SitemapDiscovery) processSitemapAny(ctx context.Context, s config.Sourc
 			}
 			loc := strings.TrimSpace(child.Loc)
 			if loc == "" {
+				continue
+			}
+			if childSitemapExcluded(loc, child.Lastmod, s.ExcludeChildSitemapPatterns, minLastmod) {
+				log.Debug().Str("child", loc).Msg("child sitemap skipped by filter")
 				continue
 			}
 			n, err := d.processSitemapAny(ctx, s, loc, remaining-added, depth+1)
@@ -207,7 +213,38 @@ type sitemapIndex struct {
 	Sitemaps []sitemapItem `xml:"sitemap"`
 }
 type sitemapItem struct {
-	Loc string `xml:"loc"`
+	Loc     string `xml:"loc"`
+	Lastmod string `xml:"lastmod"`
+}
+
+// childSitemapExcluded returns true if the child sitemap URL should be skipped.
+func childSitemapExcluded(loc, lastmod string, excludePatterns []string, minLastmod *time.Time) bool {
+	for _, pat := range excludePatterns {
+		if pat != "" && strings.Contains(loc, pat) {
+			return true
+		}
+	}
+	if minLastmod != nil {
+		t := parseSitemapDate(strings.TrimSpace(lastmod))
+		if t == nil || t.Before(*minLastmod) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseSitemapDate parses a date string in RFC3339 or YYYY-MM-DD format.
+func parseSitemapDate(s string) *time.Time {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05Z07:00", "2006-01-02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return &t
+		}
+	}
+	return nil
 }
 
 type urlSet struct {

@@ -20,8 +20,17 @@ type QueueRepository interface {
 	MarkFailed(ctx context.Context, id int64, maxAttempts int, nextRunAt time.Time, lastErr string) error
 }
 
+type DocumentListFilter struct {
+	TopicID         string
+	SourceID        string
+	FromDate        *time.Time
+	ToDate          *time.Time
+	MLConfidenceMin *float32
+	Limit           int
+}
+
 type DocumentRepository interface {
-	ListDocuments(ctx context.Context, topicID string, limit int) ([]model.Document, error)
+	ListDocuments(ctx context.Context, filter DocumentListFilter) ([]model.Document, error)
 	GetDocumentByID(ctx context.Context, id int64) (*model.Document, error)
 	UpdateDocumentML(ctx context.Context, in model.PredictedDocumentML) error
 }
@@ -46,6 +55,10 @@ type ModelRepository interface {
 
 type MigrationRepository interface {
 	Migrate(ctx context.Context, migrationsDir string) error
+}
+
+type HealthRepository interface {
+	GetHealthStats(ctx context.Context) (model.HealthStats, error)
 }
 
 type WorkflowRepository interface {

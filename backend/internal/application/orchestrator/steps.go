@@ -296,7 +296,7 @@ func (s *PredictStep) Run(ctx context.Context) (StepResult, error) {
 		return nil, err
 	}
 
-	docs, err := s.docRepo.ListDocuments(ctx, s.topic, s.limit)
+	docs, err := s.docRepo.ListDocuments(ctx, repository.DocumentListFilter{TopicID: s.topic, Limit: s.limit})
 	if err != nil {
 		return nil, err
 	}
