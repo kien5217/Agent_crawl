@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	orchestration "Agent_Crawl/internal/application/orchestrator"
+	appschedule "Agent_Crawl/internal/application/schedule"
 	"Agent_Crawl/internal/domain/repository"
 
 	"github.com/rs/zerolog/log"
@@ -154,21 +156,43 @@ func (s *Server) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 //
 //	POST /api/schedule
 func (s *Server) handleTriggerSchedule(w http.ResponseWriter, r *http.Request) {
-	result, err := s.scheduler.Run(r.Context())
+	if s.scheduleFlow == nil {
+		writeError(w, http.StatusServiceUnavailable, "schedule workflow is not configured")
+		return
+	}
+
+	runResult, err := s.scheduleFlow(r.Context())
 	if err != nil {
 		log.Error().Err(err).Msg("handleTriggerSchedule")
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if s.afterSchedule != nil {
-		if err := s.afterSchedule(r.Context()); err != nil {
-			log.Error().Err(err).Msg("handleTriggerSchedule post-schedule pipeline")
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
+	writeJSON(w, http.StatusOK, scheduleResultFromRun(runResult))
+}
+
+func scheduleResultFromRun(runResult *orchestration.RunResult) appschedule.Result {
+	result := appschedule.Result{Counts: map[string]int{}}
+	if runResult == nil {
+		return result
 	}
-	writeJSON(w, http.StatusOK, result)
+
+	discoveryResult, ok := runResult.StepResults["Discovery"]
+	if !ok || discoveryResult == nil {
+		return result
+	}
+
+	var summary struct {
+		RSSEnqueued     int `json:"rss_enqueued"`
+		SitemapEnqueued int `json:"sitemap_enqueued"`
+	}
+	if err := json.Unmarshal([]byte(discoveryResult.Summary()), &summary); err != nil {
+		return result
+	}
+
+	result.Counts["rss"] = summary.RSSEnqueued
+	result.Counts["sitemap"] = summary.SitemapEnqueued
+	return result
 }
 
 // handleListWorkflows returns recent workflow executions.
@@ -221,4 +245,80 @@ func (s *Server) handleGetHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, stats)
+}
+
+// handleListLabelQueue returns pending items from label_queue for human review.
+//
+//	GET /api/label-queue?limit=<n>
+func (s *Server) handleListLabelQueue(w http.ResponseWriter, r *http.Request) {
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	items, err := s.labeling.ListPendingLabelQueue(r.Context(), limit)
+	if err != nil {
+		log.Error().Err(err).Msg("handleListLabelQueue")
+		writeError(w, http.StatusInternalServerError, "failed to list label queue")
+		return
+	}
+	if items == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+	writeJSON(w, http.StatusOK, items)
+}
+
+// handleSubmitLabel records a gold label for a queue item.
+//
+//	POST /api/label-queue/{id}/label
+//	Body: {"topic_id":"...", "labeled_by":"..."}
+func (s *Server) handleSubmitLabel(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	queueID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid queue item id")
+		return
+	}
+
+	var body struct {
+		TopicID   string `json:"topic_id"`
+		LabeledBy string `json:"labeled_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if strings.TrimSpace(body.TopicID) == "" {
+		writeError(w, http.StatusBadRequest, "topic_id is required")
+		return
+	}
+
+	if err := s.labeling.SubmitLabel(r.Context(), queueID, body.TopicID, body.LabeledBy); err != nil {
+		log.Error().Err(err).Int64("queue_id", queueID).Msg("handleSubmitLabel")
+		writeError(w, http.StatusInternalServerError, "failed to submit label")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "labeled"})
+}
+
+// handleSkipLabelQueue marks a queue item as skipped.
+//
+//	POST /api/label-queue/{id}/skip
+func (s *Server) handleSkipLabelQueue(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	queueID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid queue item id")
+		return
+	}
+
+	if err := s.labeling.SkipLabelQueue(r.Context(), queueID); err != nil {
+		log.Error().Err(err).Int64("queue_id", queueID).Msg("handleSkipLabelQueue")
+		writeError(w, http.StatusInternalServerError, "failed to skip queue item")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "skipped"})
 }

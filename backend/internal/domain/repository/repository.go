@@ -61,6 +61,15 @@ type HealthRepository interface {
 	GetHealthStats(ctx context.Context) (model.HealthStats, error)
 }
 
+type LabelingRepository interface {
+	// ListPendingLabelQueue trả về các mục pending, ưu tiên margin thấp nhất (uncertain nhất).
+	ListPendingLabelQueue(ctx context.Context, limit int) ([]model.LabelQueueEntry, error)
+	// SubmitLabel ghi nhãn gold và đánh dấu queue item là 'labeled'.
+	SubmitLabel(ctx context.Context, queueID int64, topicID string, labeledBy string) error
+	// SkipLabelQueue đánh dấu queue item là 'skipped'.
+	SkipLabelQueue(ctx context.Context, queueID int64) error
+}
+
 type WorkflowRepository interface {
 	// Tạo mới một workflow execution (khi bắt đầu chạy)
 	CreateWorkflow(ctx context.Context, wf model.WorkflowExecution) error

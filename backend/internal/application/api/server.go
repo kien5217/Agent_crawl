@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	appschedule "Agent_Crawl/internal/application/schedule"
+	orchestration "Agent_Crawl/internal/application/orchestrator"
 	"Agent_Crawl/internal/domain/config"
 	"Agent_Crawl/internal/domain/repository"
 
@@ -13,13 +13,13 @@ import (
 
 // Server holds all dependencies for the HTTP API.
 type Server struct {
-	addr          string
-	appCfg        *config.AppConfig
-	document      repository.DocumentRepository
-	workflow      repository.WorkflowRepository
-	health        repository.HealthRepository
-	scheduler     *appschedule.Service
-	afterSchedule func(context.Context) error
+	addr         string
+	appCfg       *config.AppConfig
+	document     repository.DocumentRepository
+	workflow     repository.WorkflowRepository
+	health       repository.HealthRepository
+	labeling     repository.LabelingRepository
+	scheduleFlow func(context.Context) (*orchestration.RunResult, error)
 }
 
 // NewServer constructs an API server.
@@ -29,17 +29,17 @@ func NewServer(
 	document repository.DocumentRepository,
 	workflow repository.WorkflowRepository,
 	health repository.HealthRepository,
-	scheduler *appschedule.Service,
-	afterSchedule func(context.Context) error,
+	labeling repository.LabelingRepository,
+	scheduleFlow func(context.Context) (*orchestration.RunResult, error),
 ) *Server {
 	return &Server{
-		addr:          addr,
-		appCfg:        appCfg,
-		document:      document,
-		workflow:      workflow,
-		health:        health,
-		scheduler:     scheduler,
-		afterSchedule: afterSchedule,
+		addr:         addr,
+		appCfg:       appCfg,
+		document:     document,
+		workflow:     workflow,
+		health:       health,
+		labeling:     labeling,
+		scheduleFlow: scheduleFlow,
 	}
 }
 
@@ -55,6 +55,9 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/workflows", s.handleListWorkflows)
 	mux.HandleFunc("GET /api/workflows/{id}/steps", s.handleListSteps)
 	mux.HandleFunc("GET /api/health", s.handleGetHealth)
+	mux.HandleFunc("GET /api/label-queue", s.handleListLabelQueue)
+	mux.Handle("POST /api/label-queue/{id}/label", s.requireWriteAuth(http.HandlerFunc(s.handleSubmitLabel)))
+	mux.Handle("POST /api/label-queue/{id}/skip", s.requireWriteAuth(http.HandlerFunc(s.handleSkipLabelQueue)))
 
 	// Serve compiled React frontend from ../frontend/dist (relative to backend/)
 	mux.Handle("/", http.FileServer(http.Dir("../frontend/dist")))

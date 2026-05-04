@@ -27,6 +27,7 @@ var _ repository.CrawlWriteRepository = (*Store)(nil)
 var _ repository.LearningRepository = (*Store)(nil)
 var _ repository.ModelRepository = (*Store)(nil)
 var _ repository.HealthRepository = (*Store)(nil)
+var _ repository.LabelingRepository = (*Store)(nil)
 
 func (s *Store) Migrate(ctx context.Context, migrationsDir string) error {
 	return Migrate(ctx, s.db, migrationsDir)
@@ -130,4 +131,16 @@ func (s *Store) ListSteps(ctx context.Context, workflowID string) ([]model.StepE
 
 func (s *Store) GetHealthStats(ctx context.Context) (model.HealthStats, error) {
 	return GetHealthStats(ctx, s.db)
+}
+
+func (s *Store) ListPendingLabelQueue(ctx context.Context, limit int) ([]model.LabelQueueEntry, error) {
+	return ListPendingLabelQueue(ctx, s.db, limit)
+}
+
+func (s *Store) SubmitLabel(ctx context.Context, queueID int64, topicID string, labeledBy string) error {
+	return SubmitLabel(ctx, s.db, queueID, topicID, labeledBy)
+}
+
+func (s *Store) SkipLabelQueue(ctx context.Context, queueID int64) error {
+	return SkipLabelQueue(ctx, s.db, queueID)
 }

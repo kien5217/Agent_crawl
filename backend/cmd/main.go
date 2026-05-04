@@ -147,38 +147,31 @@ func runCommand(ctx context.Context, cmd string, opts commandOptions, rt *runtim
 			discovery.NewRSSDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
 			discovery.NewSitemapDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
 		)
-		afterSchedule := func(ctx context.Context) error {
+		scheduleFlow := func(ctx context.Context) (*orchestration.RunResult, error) {
 			const workerTimeout = 180 * time.Second
 
 			classes := splitCSV(opts.classesCSV)
 			if len(classes) == 0 {
-				return errors.New("classes must not be empty")
+				return nil, errors.New("classes must not be empty")
 			}
 
-			workerStep := orchestration.NewWorkerStep(rt.appCfg, rt.store, rt.store, opts.concurrency)
-			workerCtx, cancelWorker := context.WithTimeout(ctx, workerTimeout)
-			_, err := workerStep.Run(workerCtx)
-			cancelWorker()
-			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-				return fmt.Errorf("%s failed: %w", workerStep.Name(), err)
+			workflowDef := orchestration.WorkflowDef{
+				Name: "api-schedule-pipeline",
+				Steps: []orchestration.Step{
+					orchestration.NewDiscoveryStep(scheduler),
+					orchestration.NewWorkerStepWithTimeout(rt.appCfg, rt.store, rt.store, opts.concurrency, workerTimeout),
+					orchestration.NewWeakLabelStep(rt.store, opts.limit),
+					orchestration.NewTrainStep(rt.store, rt.store, classes, float32(opts.minWeakConf), opts.modelName, opts.modelVer),
+					orchestration.NewSelectStep(rt.store, rt.store, opts.modelName, opts.limit, opts.batchSize),
+					orchestration.NewPredictStep(rt.store, rt.store, opts.modelName, opts.pTopic, opts.limit, opts.pWrite),
+				},
 			}
 
-			steps := []orchestration.Step{
-				orchestration.NewWeakLabelStep(rt.store, opts.limit),
-				orchestration.NewTrainStep(rt.store, rt.store, classes, float32(opts.minWeakConf), opts.modelName, opts.modelVer),
-				orchestration.NewSelectStep(rt.store, rt.store, opts.modelName, opts.limit, opts.batchSize),
-				orchestration.NewPredictStep(rt.store, rt.store, opts.modelName, opts.pTopic, opts.limit, opts.pWrite),
-			}
-
-			for _, step := range steps {
-				if _, err := step.Run(ctx); err != nil {
-					return fmt.Errorf("%s failed: %w", step.Name(), err)
-				}
-			}
-			return nil
+			orchestrator := orchestration.NewOrchestrator(rt.store, 1)
+			return orchestrator.Run(ctx, workflowDef)
 		}
 
-		srv := api.NewServer(opts.apiAddr, rt.appCfg, rt.store, rt.store, rt.store, scheduler, afterSchedule)
+		srv := api.NewServer(opts.apiAddr, rt.appCfg, rt.store, rt.store, rt.store, rt.store, scheduleFlow)
 		if err := srv.Run(); err != nil {
 			log.Fatal().Err(err).Msg("api server failed")
 		}

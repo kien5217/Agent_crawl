@@ -18,12 +18,19 @@ type Orchestrator struct {
 	maxRetries int
 }
 
+type RunResult struct {
+	WorkflowID   string
+	WorkflowName string
+	Status       model.WorkflowStatus
+	StepResults  map[string]StepResult
+}
+
 func NewOrchestrator(repo repository.WorkflowRepository, maxRetries int) *Orchestrator {
 	return &Orchestrator{repo: repo, maxRetries: maxRetries}
 }
 
 // Run chạy một WorkflowDef từ đầu đến cuối, lưu mọi trạng thái vào DB.
-func (o *Orchestrator) Run(ctx context.Context, def WorkflowDef) error {
+func (o *Orchestrator) Run(ctx context.Context, def WorkflowDef) (*RunResult, error) {
 	wfExec := model.WorkflowExecution{
 		ID:           uuid.New().String(),
 		WorkflowName: def.Name,
@@ -31,7 +38,14 @@ func (o *Orchestrator) Run(ctx context.Context, def WorkflowDef) error {
 		StartedAt:    time.Now(),
 	}
 	if err := o.repo.CreateWorkflow(ctx, wfExec); err != nil {
-		return fmt.Errorf("orchestrator: cannot persist workflow: %w", err)
+		return nil, fmt.Errorf("orchestrator: cannot persist workflow: %w", err)
+	}
+
+	runResult := &RunResult{
+		WorkflowID:   wfExec.ID,
+		WorkflowName: def.Name,
+		Status:       model.WorkflowRunning,
+		StepResults:  make(map[string]StepResult, len(def.Steps)),
 	}
 
 	log.Info().Str("workflow_id", wfExec.ID).Str("name", def.Name).Msg("workflow started")
@@ -45,7 +59,7 @@ func (o *Orchestrator) Run(ctx context.Context, def WorkflowDef) error {
 			StartedAt:  time.Now(),
 		}
 		if err := o.repo.CreateStep(ctx, stepExec); err != nil {
-			return fmt.Errorf("orchestrator: cannot persist step: %w", err)
+			return nil, fmt.Errorf("orchestrator: cannot persist step: %w", err)
 		}
 
 		// --- Chạy step với retry ---
@@ -74,15 +88,17 @@ func (o *Orchestrator) Run(ctx context.Context, def WorkflowDef) error {
 			wfExec.CompletedAt = &now
 			wfExec.ErrorMsg = fmt.Sprintf("step %q failed: %s", step.Name(), lastErr)
 			_ = o.repo.UpdateWorkflow(ctx, wfExec)
+			runResult.Status = wfExec.Status
 
 			log.Error().Str("workflow_id", wfExec.ID).Str("step", step.Name()).
 				Err(lastErr).Msg("workflow failed")
-			return lastErr
+			return runResult, lastErr
 		}
 
 		// --- Lưu kết quả step ---
 		if result != nil {
 			stepExec.ResultSummaryJSON = result.Summary()
+			runResult.StepResults[step.Name()] = result
 		}
 		stepExec.Status = model.StepSuccess
 		_ = o.repo.UpdateStep(ctx, stepExec)
@@ -98,10 +114,11 @@ func (o *Orchestrator) Run(ctx context.Context, def WorkflowDef) error {
 				wfExec.CompletedAt = &now
 				wfExec.ErrorMsg = fmt.Sprintf("gate failed after %q: %s", step.Name(), reason)
 				_ = o.repo.UpdateWorkflow(ctx, wfExec)
+				runResult.Status = wfExec.Status
 
 				log.Warn().Str("workflow_id", wfExec.ID).Str("step", step.Name()).
 					Str("reason", reason).Msg("workflow halted by quality gate")
-				return fmt.Errorf("halted: %s", reason)
+				return runResult, fmt.Errorf("halted: %s", reason)
 			}
 		}
 	}
@@ -110,7 +127,8 @@ func (o *Orchestrator) Run(ctx context.Context, def WorkflowDef) error {
 	wfExec.Status = model.WorkflowCompleted
 	wfExec.CompletedAt = &now
 	_ = o.repo.UpdateWorkflow(ctx, wfExec)
+	runResult.Status = wfExec.Status
 
 	log.Info().Str("workflow_id", wfExec.ID).Msg("workflow completed")
-	return nil
+	return runResult, nil
 }

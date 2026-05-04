@@ -3,6 +3,7 @@ package orchestration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"Agent_Crawl/internal/application/learning"
@@ -50,17 +51,31 @@ type WorkerStep struct {
 	queue       repository.QueueRepository
 	crawlDoc    repository.CrawlWriteRepository
 	concurrency int
+	timeout     time.Duration
 }
 
 func NewWorkerStep(cfg *config.AppConfig, queue repository.QueueRepository,
 	crawlDoc repository.CrawlWriteRepository, concurrency int) *WorkerStep {
 	return &WorkerStep{cfg: cfg, queue: queue, crawlDoc: crawlDoc, concurrency: concurrency}
 }
+
+func NewWorkerStepWithTimeout(cfg *config.AppConfig, queue repository.QueueRepository,
+	crawlDoc repository.CrawlWriteRepository, concurrency int, timeout time.Duration) *WorkerStep {
+	return &WorkerStep{cfg: cfg, queue: queue, crawlDoc: crawlDoc, concurrency: concurrency, timeout: timeout}
+}
 func (s *WorkerStep) Name() string { return "Worker" }
 func (s *WorkerStep) Run(ctx context.Context) (StepResult, error) {
+	if s.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.timeout)
+		defer cancel()
+	}
 	clf := classify.NewKeywordClassifier(s.cfg.Topics, s.cfg.Config.Classify.MinScoreToAccept)
 	w := worker.New(s.cfg.Config, clf, s.queue, s.crawlDoc)
 	if err := w.Run(ctx, s.concurrency); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			return &jsonResult{data: map[string]any{"status": "timeout"}}, nil
+		}
 		return nil, err
 	}
 	return &jsonResult{data: map[string]any{"status": "done"}}, nil
