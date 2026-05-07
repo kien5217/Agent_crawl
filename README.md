@@ -228,4 +228,3 @@ Ghi chú ngắn:
 
 ---
 
-Nếu bạn muốn, tôi có thể xuất diagram này thành file hình ảnh (SVG/PNG) hoặc thêm biểu đồ tuần tự chi tiết cho từng workflow step.
