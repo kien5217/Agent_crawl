@@ -1,8 +1,28 @@
-import { useEffect, useState } from 'react'
+import { JSX, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import type { Document } from '../api/types'
 import styles from './Page.module.css'
+
+function highlightText(text: string, keywords: string[]): JSX.Element {
+  if (!keywords.length) return <>{text}</>
+
+  // Create a regex that matches any of the keywords (case-insensitive)
+  const regex = new RegExp(`(${keywords.map(kw => kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
+  const parts = text.split(regex)
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        keywords.some(kw => kw.toLowerCase() === part.toLowerCase()) ? (
+          <mark key={i} className={styles.highlight}>{part}</mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  )
+}
 
 export default function DocumentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -36,10 +56,18 @@ export default function DocumentDetailPage() {
         <dd>{doc.SourceID}</dd>
         <dt>Published</dt>
         <dd>{doc.PublishedAt ? new Date(doc.PublishedAt).toLocaleString() : '—'}</dd>
+        {doc.Keywords.length > 0 && (
+          <>
+            <dt>Keywords</dt>
+            <dd>{doc.Keywords.join(', ')}</dd>
+          </>
+        )}
       </dl>
       <section>
         <h3>Content</h3>
-        <pre className={styles.content}>{doc.ContentText}</pre>
+        <div className={styles.content}>
+          {highlightText(doc.ContentText, doc.Keywords)}
+        </div>
       </section>
     </div>
   )

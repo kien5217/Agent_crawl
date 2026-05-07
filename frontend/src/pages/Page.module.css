@@ -172,6 +172,12 @@
   overflow-y: auto;
 }
 
+.highlight {
+  background-color: #fef3c7;
+  padding: 2px 0;
+  border-radius: 2px;
+}
+
 @media (max-width: 768px) {
   .filterField {
     min-width: 100%;
@@ -180,4 +186,94 @@
   .filterActions {
     width: 100%;
   }
+}
+
+/* ── Labeling page ─────────────────────────────────────────── */
+
+.btnPrimary {
+  padding: 8px 20px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.badge {
+  font-size: 0.8rem;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.chip {
+  display: inline-block;
+  font-size: 0.78rem;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+}
+
+.labelCard {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  margin-top: 16px;
+}
+
+.labelMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.labelTitle {
+  font-size: 1.05rem;
+  margin: 0 0 14px;
+}
+
+.labelTitle a {
+  color: #1e40af;
+  text-decoration: none;
+}
+
+.labelTitle a:hover {
+  text-decoration: underline;
+}
+
+.labelContent {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  background: #f8fafc;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+}
+
+.labelActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
 }

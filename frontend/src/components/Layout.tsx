@@ -4,7 +4,10 @@ import styles from './Layout.module.css'
 const navItems = [
   { to: '/documents', label: 'Documents' },
   { to: '/topics', label: 'Topics' },
+  { to: '/sources', label: 'Sources' },
+  { to: '/dashboard', label: 'Dashboard' },
   { to: '/workflows', label: 'Workflows' },
+  { to: '/labeling', label: 'Labeling' },
   { to: '/health', label: 'Health' },
 ]
 

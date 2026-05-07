@@ -1,280 +1,231 @@
 ﻿# Agent Crawl
 
-Agent Crawl là hệ thống thu thập và xử lý nội dung theo pipeline Discovery -> Crawl/Extract -> Classification -> Learning, hiện đã tách thành hai phần:
-- backend (Go): domain logic, pipeline, API, persistence.
-- frontend (React + Vite): dashboard vận hành và quan sát workflow.
+Agent Crawl là một hệ thống thu thập và xử lý nội dung (discovery → crawl/extract → classify → learning) gồm hai thành phần chính:
 
-## 1. Bức tranh kiến trúc tổng thể
+- Backend (Go): API, pipeline xử lý, ML, và persistence (Postgres).
+- Frontend (React + Vite): dashboard quản lý, xem kết quả và kích hoạt pipeline.
 
-### 1.1 Context architecture
+Phiên bản đầy đủ cấu trúc hiện tại của repository.
 
-```text
-+---------------------------+         HTTP/JSON         +---------------------------+
-| Frontend (React + Vite)  | <-----------------------> | Backend API (Go net/http) |
-| - Documents UI           |                           | - /api/topics             |
-| - Workflow UI            |                           | - /api/documents          |
-| - Trigger schedule       |                           | - /api/schedule           |
-+---------------------------+                           +-------------+-------------+
-                                                                      |
-                                                                      | Repository interfaces
-                                                                      v
-                                                          +-----------+------------+
-                                                          | Infrastructure (Go)    |
-                                                          | - Discovery (RSS/Site) |
-                                                          | - Fetcher/Extractor    |
-                                                          | - Classifier           |
-                                                          | - ML pipeline          |
-                                                          | - Postgres Store       |
-                                                          +-----------+------------+
-                                                                      |
-                                                                      v
-                                                          +------------------------+
-                                                          | PostgreSQL             |
-                                                          | queue, documents, ML,  |
-                                                          | workflow executions     |
-                                                          +------------------------+
-```
+## Nhanh chóng nắm bắt
 
-### 1.2 Layered architecture (backend)
+- Project root: repository chứa hai thư mục chính: `backend/` và `frontend/`.
+- Backend binary entrypoint: `backend/cmd` (các command: `migrate`, `api`, `worker`, `schedule`, `train`, `select`, ...).
+- Frontend dev: Vite dev server chạy trên `localhost:5173` (mặc định), proxy API tới backend.
 
-```text
-cmd/main.go
-  -> internal/application
-     -> api           (HTTP handlers + routing)
-     -> cli           (batch/ops commands)
-     -> schedule      (discovery orchestration)
-     -> worker        (crawl processing)
-     -> learning      (weak_label, train, select)
-     -> orchestrator  (workflow + step execution)
-     -> loader        (YAML config loader)
+## Cấu trúc chính
 
-  -> internal/domain
-     -> model         (entities)
-     -> repository    (interfaces/contracts)
-     -> config        (AppConfig)
+Chi tiết cấu trúc dự án (thư mục / file chính):
 
-  -> internal/infrastructure
-     -> discovery, fetcher, extract, classify, machine_learning
-     -> persistence/postgres (repository implementations)
-```
+- `backend/`
+  - `go.mod`, `go.sum`
+  - `cmd/`
+    - `main.go` (entrypoint CLI: `migrate`, `api`, `worker`, `schedule`, ...)
+  - `config/`
+    - `config.yaml`
+    - `sources.yaml`
+    - `topics.yaml`
+  - `internal/`
+    - `application/`
+      - `api/`
+        - `server.go`
+        - `handlers.go`
+        - `auth.go`
+      - `cli/`
+        - `service.go`
+      - `learning/`
+        - `select_service.go`
+        - `train_service.go`
+        - `weak_label_service.go`
+      - `loader/`
+        - `service.go`
+      - `orchestrator/`
+        - `orchestrator.go`
+        - `step.go`
+        - `steps.go`
+        - `workflow.go`
+        - `workflows.go`
+      - `schedule/`
+        - `service.go`
+      - `worker/`
+        - `service.go`
+    - `domain/`
+      - `config/`
+        - `AppConfig.go`
+      - `model/`
+        - `dashboard.go`
+        - `document.go`
+        - `health.go`
+        - `learning.go`
+        - `queue.go`
+        - `workflow.go`
+      - `repository/`
+        - `repository.go`
+    - `infrastructure/`
+      - `classify/`
+        - `classify.go`
+      - `discovery/`
+        - `normalize.go`
+        - `rss.go`
+        - `sitemap.go`
+        - `topic_filter/`
+          - `ai_filter.go`
+          - `cloud_filter.go`
+          - `cve_filter.go`
+          - `topic_filter.go`
+      - `extract/`
+        - `extract.go`
+      - `fetcher/`
+        - `fetcher.go`
+      - `machine_learning/`
+        - `batch_balanced.go`
+        - `logistic_regression.go`
+        - `model_bundle_codec.go`
+        - `tfidf_vectorizer.go`
+      - `persistence/`
+        - `postgres/`
+          - `bootstrap.go`
+          - `connect.go`
+          - `dashboard.go`
+          - `db.go`
+          - `documents.go`
+          - `health.go`
+          - `labeling.go`
+          - `learning.go`
+          - `migrate.go`
+          - `queue.go`
+          - `store.go`
+          - `workflow.go`
+    - `platform/`
+      - `text_util.go`
+      - `timeparse_util.go`
+  - `migrations/`
+    - `001_init.up.sql`
+    - `002_learning.up.sql`
+    - `003_documents_ml.up.sql`
+    - `004_workflow.up.sql`
+    - `005_add_simhash.up.sql`
 
-### 1.3 Current workspace structure
+- `frontend/`
+  - `index.html`
+  - `package.json`
+  - `tsconfig.app.json`
+  - `tsconfig.json`
+  - `tsconfig.node.json`
+  - `vite.config.ts`
+  - `src/`
+    - `App.tsx`
+    - `index.css`
+    - `main.tsx`
+    - `vite-env.d.ts`
+    - `api/`
+      - `client.ts`
+      - `types.ts`
+    - `components/`
+      - `Layout.module.css`
+      - `Layout.tsx`
+    - `pages/`
+      - `DashboardPage.tsx`
+      - `DocumentDetailPage.tsx`
+      - `DocumentsPage.tsx`
+      - `HealthPage.tsx`
+      - `LabelingPage.tsx`
+      - `Page.module.css`
+      - `SourcesPage.tsx`
+      - `TopicsPage.tsx`
+      - `WorkflowsPage.tsx`
+      - `WorkflowStepsPage.tsx`
 
-```text
-Agent_Crawl/
-  backend/
-    cmd/
-    config/
-    internal/
-    migrations/
-    go.mod
-    go.sum
-  frontend/
-    src/
-    package.json
-    vite.config.ts
-  README.md
-```
+## Quick start (Windows / PowerShell)
 
-### 1.4 Runtime topology
+1) Backend (dev)
 
-- Backend service chạy bằng lệnh api command, expose HTTP API và phục vụ static frontend build từ ../frontend/dist.
-- Frontend dev mode chạy Vite tại localhost:5173, proxy /api về localhost:8080.
-- Data plane tập trung ở PostgreSQL.
-
-## 2. Technical design chi tiết
-
-### 2.1 Backend composition
-
-#### Entrypoint và dependency wiring
-- File: backend/cmd/main.go
-- Chịu trách nhiệm:
-  - Parse command-line options.
-  - Load config YAML (config.yaml, topics.yaml, sources.yaml).
-  - Open DB connection.
-  - Wire postgres.Store vào các repository interfaces.
-  - Chạy command tương ứng: migrate, schedule, worker, list, show, weak_label, train, select, predict, api.
-
-#### API module
-- Files:
-  - backend/internal/application/api/server.go
-  - backend/internal/application/api/handlers.go
-  - backend/internal/application/api/auth.go
-- Routing hiện có:
-  - GET /api/topics
-  - GET /api/documents?topic=&limit=
-  - GET /api/documents/{id}
-  - POST /api/schedule
-  - GET /api/workflows?limit=
-  - GET /api/workflows/{id}/steps
-- CORS: allow all origin cho local dev.
-- Static serve: route / trỏ tới ../frontend/dist.
-- Auth: endpoint ghi dữ liệu `POST /api/schedule` yêu cầu một trong hai cơ chế:
-  - `X-API-Key: <value>` khớp `auth.api_key` trong `config.yaml`.
-  - `Authorization: Bearer <jwt>` với JWT ký `HS256` bằng `auth.jwt_secret`.
-
-#### Schedule -> Learning orchestration qua API
-- POST /api/schedule không chỉ discovery.
-- Sau khi discovery thành công, backend chạy post-schedule pipeline:
-  1. Worker step (timeout 180s).
-  2. WeakLabel step.
-  3. Train step.
-  4. Select step.
-  5. Predict step.
-- Mục tiêu: 1 nút Run Schedule ở frontend có thể kích hoạt full cycle.
-
-### 2.2 Domain and repositories
-
-- Domain models: document, learning, queue, workflow.
-- Repository contracts đặt tại backend/internal/domain/repository/repository.go.
-- postgres.Store implement các contracts:
-  - BootstrapRepository
-  - QueueRepository
-  - DocumentRepository
-  - CrawlWriteRepository
-  - LearningRepository
-  - ModelRepository
-  - MigrationRepository
-  - WorkflowRepository
-
-### 2.3 Discovery design
-
-- Discovery sources gồm RSS và Sitemap.
-- URL normalize trước khi enqueue.
-- Topic filtering theo source/topic config và heuristic theo từng nhóm topic.
-- Output của discovery ghi vào crawl_queue với priority.
-
-### 2.4 Worker design
-
-Pipeline mỗi queue item:
-1. Dequeue batch từ DB (lock-safe).
-2. Fetch HTML.
-3. Extract title/content/metadata.
-4. Rule-based classify.
-5. Quality gate nội dung.
-6. Upsert documents.
-7. Mark done/fail và retry theo policy.
-
-### 2.5 Learning/ML design
-
-ML stack (backend/internal/infrastructure/machine_learning):
-- TF-IDF vectorizer.
-- Logistic Regression.
-- Model bundle codec.
-- Batch selection cân bằng cho active learning.
-
-Use-cases learning:
-- weak_label: sinh nhãn yếu cho tài liệu chưa gán.
-- train: train model từ gold + weak labels theo confidence threshold.
-- select: chọn mẫu uncertain/diverse cho label_queue.
-- predict: ghi ml_topic/ml_confidence/ml_scores trở lại documents.
-
-### 2.6 Workflow persistence
-
-- Workflow executions và step executions được lưu DB.
-- API frontend có thể truy vấn list workflows và step logs để theo dõi quá trình chạy.
-
-### 2.7 Frontend design
-
-- Framework: React + TypeScript + Vite.
-- Main modules:
-  - Documents page: list/filter/detail, trigger schedule.
-  - Topics page: taxonomy view.
-  - Workflows page: lịch sử execution.
-  - Workflow steps page: logs theo workflow.
-- API client tách riêng trong frontend/src/api/client.ts.
-
-### 2.8 Security/operations notes (Windows Application Control)
-
-Trong môi trường có AppLocker/WDAC:
-- Có thể bị chặn go run ./cmd do Go tạo binary tạm trong AppData.
-- Có thể bị chặn native Node addon (rollup.win32-x64-msvc.node).
-
-Khuyến nghị run commands:
-
-```bash
-# Backend (policy-friendly)
+```powershell
 cd backend
-go run ./cmd/main.go api --config ./config/config.yaml --addr :8080
-
-# Hoặc build binary cố định
-cd backend
-go build -o ./bin/agent-crawl.exe ./cmd
-./bin/agent-crawl.exe api --config ./config/config.yaml --addr :8080
-
-# Frontend
-cd frontend
-npm install
-npm run dev
-```
-
-## 3. Feature matrix hiện có
-
-| Domain | Feature | Status | Notes |
-|---|---|---|---|
-| Discovery | RSS discovery | Done | Enqueue URL từ RSS sources |
-| Discovery | Sitemap discovery | Done | Hỗ trợ sitemap/urlset, giới hạn theo config |
-| Queue | Retry/backoff | Done | attempts + next_run_at + max attempts |
-| Processing | HTML fetch + extract | Done | Trích xuất title/content/metadata |
-| Processing | Rule-based topic classification | Done | Dựa trên topics/keywords config |
-| Persistence | Upsert document + dedupe | Done | Theo canonical URL/content hash |
-| Learning | Weak labeling | Done | labels_weak pipeline |
-| Learning | Model training | Done | TF-IDF + Logistic Regression |
-| Learning | Active learning selection | Done | Chọn batch cho label queue |
-| Learning | Prediction write-back | Done | Cập nhật ml_* columns trên documents |
-| Workflow | Workflow execution persistence | Done | Lưu workflow/steps vào DB |
-| API | Document/topic/workflow endpoints | Done | Expose qua net/http mux |
-| API | Trigger full schedule pipeline | Done | POST /api/schedule có post-schedule steps |
-| API | Write auth (API key/JWT) | Done | POST /api/schedule chặn unauthorized |
-| Frontend | Documents dashboard | Done | List/filter/detail + run schedule |
-| Frontend | Workflow monitor UI | Done | Workflow list + steps |
-| Frontend | Topics UI | Done | Danh sách taxonomy |
-| Deployment | Serve frontend dist từ backend | Done | Route / -> ../frontend/dist |
-
-## 4. Roadmap ngắn hạn
-
-- Thêm auth/authz cho API trước khi public deployment.
-- Bổ sung metrics và health endpoints (queue lag, success rate, step duration).
-- Tối ưu hóa observability: trace theo workflow_id.
-- Bổ sung integration tests cho API và orchestrator pipeline.
-- Tách scheduler và worker thành process độc lập nếu cần scale lớn.
-
-## 5. Quick start
-
-### 5.1 Backend
-
-```bash
-cd backend
-set API_KEY=local-dev-key
-# optional if bạn muốn dùng JWT thay vì API key
-set JWT_SECRET=replace-this-with-long-secret
+# Ensure required environment variables are set (e.g. API_KEY, JWT_SECRET)
 go run ./cmd/main.go migrate --config ./config/config.yaml
 go run ./cmd/main.go api --config ./config/config.yaml --addr :8080
 ```
 
-Ví dụ trigger schedule với API key:
+Gợi ý: nếu môi trường có chính sách AppLocker/WDAC, build binary cố định và chạy:
 
-```bash
-curl -X POST http://localhost:8080/api/schedule -H "X-API-Key: local-dev-key"
+```powershell
+cd backend
+go build -o .\bin\agent-crawl.exe ./cmd
+.\bin\agent-crawl.exe api --config ./config/config.yaml --addr :8080
 ```
 
-### 5.2 Frontend (dev)
+2) Frontend (dev)
 
-```bash
+```powershell
 cd frontend
 npm install
-# optional nếu muốn nút Run Schedule gửi auth header
-set VITE_API_KEY=local-dev-key
-# hoặc
-set VITE_API_BEARER_TOKEN=<jwt-token>
+# Ensure frontend will send auth when needed (set VITE_API_KEY or VITE_API_BEARER_TOKEN in your env)
 npm run dev
 ```
 
-### 5.3 Frontend production build
+3) Trigger schedule (ví dụ)
 
-```bash
-cd frontend
-npm run build
+```powershell
+curl -X POST http://localhost:8080/api/schedule -H "X-API-Key: <your-api-key>"
 ```
 
-Sau khi build, backend sẽ phục vụ nội dung từ frontend/dist qua route /.
+## Những điểm quan trọng
+
+- API write endpoints (ví dụ `/api/schedule`) yêu cầu authentication: `X-API-Key` hoặc `Authorization: Bearer <jwt>` (JWT HS256 với `auth.jwt_secret`).
+- Backend lưu workflow và step execution vào DB — frontend có thể truy vấn lịch sử và log.
+- ML stack hiện có: TF-IDF vectorizer + Logistic Regression; pipeline support: weak_label → train → select → predict.
+
+## Luồng hoạt động (Sequence diagram)
+
+Dưới đây là sequence diagram (Mermaid) mô tả luồng chính giữa frontend, backend, worker và các thành phần hạ tầng:
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant FE as Frontend (React)
+    participant API as Backend API
+    participant OR as Orchestrator
+    participant DISC as Discovery (RSS/Sitemap)
+    participant Q as Queue (Postgres)
+    participant W as Worker
+    participant F as Fetcher
+    participant E as Extractor
+    participant C as Classifier
+    participant ML as ML Service
+    participant DB as Postgres
+
+    U->>FE: Click "Run schedule" / browse UI
+    FE->>API: HTTP POST /api/schedule
+    API->>OR: start schedule (create workflow)
+    OR->>DISC: run discovery (RSS / Sitemap)
+    DISC->>Q: enqueue discovered URLs
+    OR->>Q: enqueue schedule tasks / workflow steps
+
+    loop worker processing
+      W->>Q: dequeue job
+      W->>F: fetch URL
+      F-->>W: HTML
+      W->>E: extract content
+      E-->>W: document data
+      W->>C: classify / assign topic
+      C-->>W: classification result
+      W->>DB: upsert document, update queue/step status
+    end
+
+    OR->>ML: trigger weak_label / train / select / predict
+    ML->>DB: write predictions / model artifacts
+    DB-->>API: workflow & step status (via queries)
+    API-->>FE: status updates / endpoints for workflow and documents
+    FE-->>U: UI shows progress / results
+```
+
+Ghi chú ngắn:
+
+- `API` là điểm tiếp nhận lệnh từ `FE` và lập workflow (gọi `Orchestrator`).
+- `Discovery` tạo các task enqueue vào `Queue` (Postgres); `Worker` tiêu thụ queue để fetch/extract/classify và ghi kết quả về DB.
+- `Orchestrator` chịu trách nhiệm chạy các bước post-schedule: weak_label → train → select → predict (gọi `ML Service` hoặc module nội bộ).
+
+---
+
+Nếu bạn muốn, tôi có thể xuất diagram này thành file hình ảnh (SVG/PNG) hoặc thêm biểu đồ tuần tự chi tiết cho từng workflow step.

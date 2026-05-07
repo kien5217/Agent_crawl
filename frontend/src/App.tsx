@@ -6,6 +6,9 @@ import TopicsPage from './pages/TopicsPage'
 import WorkflowsPage from './pages/WorkflowsPage'
 import WorkflowStepsPage from './pages/WorkflowStepsPage'
 import HealthPage from './pages/HealthPage'
+import LabelingPage from './pages/LabelingPage'
+import SourcesPage from './pages/SourcesPage'
+import DashboardPage from './pages/DashboardPage'
 
 export default function App() {
   return (
@@ -19,6 +22,9 @@ export default function App() {
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="workflows/:id/steps" element={<WorkflowStepsPage />} />
           <Route path="health" element={<HealthPage />} />
+          <Route path="labeling" element={<LabelingPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="sources" element={<SourcesPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

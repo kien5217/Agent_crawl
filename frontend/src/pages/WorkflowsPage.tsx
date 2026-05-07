@@ -5,10 +5,12 @@ import type { WorkflowExecution } from '../api/types'
 import styles from './Page.module.css'
 
 const statusColor: Record<string, string> = {
-  running: '#f59e0b',
-  done: '#22c55e',
-  failed: '#ef4444',
-  halted: '#6b7280',
+pending: '#6b7280',
+running: '#f59e0b',
+completed: '#22c55e',
+success: '#22c55e',
+failed: '#ef4444',
+halted: '#6b7280',
 }
 
 export default function WorkflowsPage() {
@@ -45,7 +47,7 @@ export default function WorkflowsPage() {
             {workflows.map((wf) => (
               <tr key={wf.ID}>
                 <td><code>{wf.ID.slice(0, 8)}…</code></td>
-                <td>{wf.Name}</td>
+                <td>{wf.Name ?? wf.WorkflowName ?? '—'}</td>
                 <td>
                   <span style={{ color: statusColor[wf.Status] ?? '#222', fontWeight: 600 }}>
                     {wf.Status}

@@ -15,9 +15,12 @@ import (
 type Server struct {
 	addr         string
 	appCfg       *config.AppConfig
+	topicsPath   string
+	sourcesPath  string
 	document     repository.DocumentRepository
 	workflow     repository.WorkflowRepository
 	health       repository.HealthRepository
+	stats        repository.StatsRepository
 	labeling     repository.LabelingRepository
 	scheduleFlow func(context.Context) (*orchestration.RunResult, error)
 }
@@ -26,18 +29,24 @@ type Server struct {
 func NewServer(
 	addr string,
 	appCfg *config.AppConfig,
+	topicsPath string,
+	sourcesPath string,
 	document repository.DocumentRepository,
 	workflow repository.WorkflowRepository,
 	health repository.HealthRepository,
+	stats repository.StatsRepository,
 	labeling repository.LabelingRepository,
 	scheduleFlow func(context.Context) (*orchestration.RunResult, error),
 ) *Server {
 	return &Server{
 		addr:         addr,
 		appCfg:       appCfg,
+		topicsPath:   topicsPath,
+		sourcesPath:  sourcesPath,
 		document:     document,
 		workflow:     workflow,
 		health:       health,
+		stats:        stats,
 		labeling:     labeling,
 		scheduleFlow: scheduleFlow,
 	}
@@ -48,17 +57,18 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 
 	// REST API endpoints
-	mux.HandleFunc("GET /api/topics", s.handleListTopics)
-	mux.HandleFunc("GET /api/documents", s.handleListDocuments)
-	mux.HandleFunc("GET /api/documents/{id}", s.handleGetDocument)
-	mux.Handle("POST /api/schedule", s.requireWriteAuth(http.HandlerFunc(s.handleTriggerSchedule)))
-	mux.HandleFunc("GET /api/workflows", s.handleListWorkflows)
-	mux.HandleFunc("GET /api/workflows/{id}/steps", s.handleListSteps)
-	mux.HandleFunc("GET /api/health", s.handleGetHealth)
-	mux.HandleFunc("GET /api/label-queue", s.handleListLabelQueue)
-	mux.Handle("POST /api/label-queue/{id}/label", s.requireWriteAuth(http.HandlerFunc(s.handleSubmitLabel)))
-	mux.Handle("POST /api/label-queue/{id}/skip", s.requireWriteAuth(http.HandlerFunc(s.handleSkipLabelQueue)))
-
+	mux.HandleFunc("/api/topics", s.handleTopics)
+	mux.HandleFunc("/api/sources", s.handleSources)
+	mux.HandleFunc("/api/documents/near-duplicates", s.handleListNearDuplicates)
+	mux.HandleFunc("/api/documents", s.handleListDocuments)
+	mux.HandleFunc("/api/documents/", s.handleGetDocument)
+	mux.Handle("/api/schedule", s.requireWriteAuth(http.HandlerFunc(s.handleTriggerSchedule)))
+	mux.HandleFunc("/api/workflows", s.handleListWorkflows)
+	mux.HandleFunc("/api/workflows/", s.handleListSteps)
+	mux.HandleFunc("/api/health", s.handleGetHealth)
+	mux.HandleFunc("/api/dashboard", s.handleGetDashboard)
+	mux.HandleFunc("/api/label-queue", s.handleListLabelQueue)
+	mux.Handle("/api/label-queue/", s.requireWriteAuth(http.HandlerFunc(s.handleLabelQueueAction)))
 	// Serve compiled React frontend from ../frontend/dist (relative to backend/)
 	mux.Handle("/", http.FileServer(http.Dir("../frontend/dist")))
 

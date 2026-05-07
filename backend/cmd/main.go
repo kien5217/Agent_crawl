@@ -143,6 +143,10 @@ func initRuntime(ctx context.Context, configPath string) (*runtime, error) {
 func runCommand(ctx context.Context, cmd string, opts commandOptions, rt *runtime) {
 	// HTTP API server command handled separately (does not use CLI handlers map)
 	if cmd == "api" {
+		if err := rt.store.Migrate(ctx, "./migrations"); err != nil {
+			log.Fatal().Err(err).Msg("database migration failed")
+		}
+
 		scheduler := appschedule.NewService(
 			discovery.NewRSSDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
 			discovery.NewSitemapDiscovery(rt.appCfg.Config, rt.appCfg.Topics, rt.appCfg.Sources, rt.store),
@@ -171,7 +175,7 @@ func runCommand(ctx context.Context, cmd string, opts commandOptions, rt *runtim
 			return orchestrator.Run(ctx, workflowDef)
 		}
 
-		srv := api.NewServer(opts.apiAddr, rt.appCfg, rt.store, rt.store, rt.store, rt.store, scheduleFlow)
+		srv := api.NewServer(opts.apiAddr, rt.appCfg, "./config/topics.yaml", "./config/sources.yaml", rt.store, rt.store, rt.store, rt.store, rt.store, scheduleFlow)
 		if err := srv.Run(); err != nil {
 			log.Fatal().Err(err).Msg("api server failed")
 		}

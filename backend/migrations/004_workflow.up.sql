@@ -1,4 +1,4 @@
-CREATE TABLE workflow_executions (
+CREATE TABLE IF NOT EXISTS workflow_executions (
     id            TEXT PRIMARY KEY,
     workflow_name TEXT        NOT NULL,
     status        TEXT        NOT NULL DEFAULT 'pending',
@@ -7,7 +7,7 @@ CREATE TABLE workflow_executions (
     error_msg     TEXT        NOT NULL DEFAULT ''
 );
 
-CREATE TABLE step_executions (
+CREATE TABLE IF NOT EXISTS step_executions (
     id                   TEXT PRIMARY KEY,
     workflow_id          TEXT        NOT NULL REFERENCES workflow_executions(id),
     step_name            TEXT        NOT NULL,
@@ -19,5 +19,5 @@ CREATE TABLE step_executions (
     completed_at         TIMESTAMPTZ
 );
 
-CREATE INDEX idx_step_executions_workflow_id ON step_executions(workflow_id);
-CREATE INDEX idx_workflow_executions_started_at ON workflow_executions(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_step_executions_workflow_id ON step_executions(workflow_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_started_at ON workflow_executions(started_at DESC);

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"Agent_Crawl/internal/domain/config"
 	"Agent_Crawl/internal/domain/model"
 	"Agent_Crawl/internal/domain/repository"
 
@@ -81,26 +82,52 @@ func GetDocumentByID(ctx context.Context, db DB, id int64) (*model.Document, err
 	return &r, nil
 }
 
+func GetDocumentWithKeywords(ctx context.Context, db DB, id int64, topics config.TopicsFile) (*model.Document, error) {
+	var r model.Document
+	err := db.QueryRow(ctx, `
+		SELECT id, title, url, canonical_url, topic_id, published_at, content_text, source_id
+		FROM documents
+		WHERE id = $1
+	`, id).Scan(&r.ID, &r.Title, &r.URL, &r.CanonicalURL, &r.TopicID, &r.PublishedAt, &r.ContentText, &r.SourceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find keywords for the topic
+	for _, topic := range topics.Topics {
+		if topic.ID == r.TopicID {
+			r.Keywords = make([]string, len(topic.Keywords))
+			for i, kw := range topic.Keywords {
+				r.Keywords[i] = kw.Term
+			}
+			break
+		}
+	}
+
+	return &r, nil
+}
+
 func UpsertCrawledDocument(ctx context.Context, db DB, in model.CrawledDocument) error {
 	_, err := db.Exec(ctx, `
 		INSERT INTO documents (
 		  url, canonical_url, domain, source_id,
 		  title, published_at, author, content_text,
-		  content_hash, topic_id, topic_scores, lang
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)
+		  content_hash, content_simhash, topic_id, topic_scores, lang
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)
 		ON CONFLICT (canonical_url) DO UPDATE SET
 		  title = EXCLUDED.title,
 		  published_at = COALESCE(EXCLUDED.published_at, documents.published_at),
 		  author = EXCLUDED.author,
 		  content_text = EXCLUDED.content_text,
 		  content_hash = EXCLUDED.content_hash,
+		  content_simhash = EXCLUDED.content_simhash,
 		  topic_id = EXCLUDED.topic_id,
 		  topic_scores = EXCLUDED.topic_scores,
 		  lang = EXCLUDED.lang,
 		  updated_at = now()
 	`, in.URL, in.CanonicalURL, in.Domain, in.SourceID,
 		in.Title, in.PublishedAt, in.Author, in.ContentText,
-		in.ContentHash, in.TopicID, in.TopicScoresJSON, in.Lang,
+		in.ContentHash, int64(in.ContentSimHash), in.TopicID, in.TopicScoresJSON, in.Lang,
 	)
 	return err
 }

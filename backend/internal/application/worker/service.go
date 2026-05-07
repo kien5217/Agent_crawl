@@ -91,6 +91,7 @@ func (w *Worker) handleOne(ctx context.Context, it model.QueueItem) {
 
 	pub := util.ParseTimeBestEffort(ex.PublishedAt)
 	hash := util.HashText(ex.Title + "\n" + ex.ContentText)
+	simhash := util.SimHashText(ex.Title + "\n" + ex.ContentText)
 
 	scoresJSON, _ := json.Marshal(cls.Scores)
 
@@ -104,6 +105,7 @@ func (w *Worker) handleOne(ctx context.Context, it model.QueueItem) {
 		Author:          ex.Author,
 		ContentText:     ex.ContentText,
 		ContentHash:     hash,
+		ContentSimHash:  simhash,
 		TopicID:         cls.TopicID,
 		TopicScoresJSON: string(scoresJSON),
 		Lang:            ex.Lang,

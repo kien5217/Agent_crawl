@@ -32,6 +32,7 @@ type DocumentListFilter struct {
 type DocumentRepository interface {
 	ListDocuments(ctx context.Context, filter DocumentListFilter) ([]model.Document, error)
 	GetDocumentByID(ctx context.Context, id int64) (*model.Document, error)
+	GetDocumentWithKeywords(ctx context.Context, id int64, topics config.TopicsFile) (*model.Document, error)
 	UpdateDocumentML(ctx context.Context, in model.PredictedDocumentML) error
 }
 
@@ -59,6 +60,16 @@ type MigrationRepository interface {
 
 type HealthRepository interface {
 	GetHealthStats(ctx context.Context) (model.HealthStats, error)
+}
+
+type StatsRepository interface {
+	GetDocumentCountsByDayTopic(ctx context.Context) ([]model.DocumentCountByDayTopic, error)
+	GetDocumentCountsByTopic(ctx context.Context) ([]model.DocumentCountByTopic, error)
+	GetTopSources(ctx context.Context, limit int) ([]model.SourceCount, error)
+	GetSourceFailCounts(ctx context.Context) ([]model.SourceFailCount, error)
+	GetSourceLastPostTimes(ctx context.Context) ([]model.SourceLastPost, error)
+	GetQueueFailureMetrics(ctx context.Context) (failCount int64, processedCount int64, err error)
+	ListRecentSimhashDocuments(ctx context.Context, limit int) ([]model.NearDuplicateDoc, error)
 }
 
 type LabelingRepository interface {

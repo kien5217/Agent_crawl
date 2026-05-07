@@ -63,13 +63,14 @@ type SourcesFile struct {
 }
 
 type Source struct {
-	ID          string   `yaml:"id"`
-	Name        string   `yaml:"name"`
-	Domain      string   `yaml:"domain"`
-	RSSURL      string   `yaml:"rss_url"`
-	SitemapURLs []string `yaml:"sitemap_urls"`
-	TopicIDs    []string `yaml:"topic_ids"`
-	Enabled     bool     `yaml:"enabled"`
+	ID           string   `yaml:"id"`
+	Name         string   `yaml:"name"`
+	Domain       string   `yaml:"domain"`
+	RSSURL       string   `yaml:"rss_url"`
+	ScheduleFreq string   `yaml:"schedule_freq"`
+	SitemapURLs  []string `yaml:"sitemap_urls"`
+	TopicIDs     []string `yaml:"topic_ids"`
+	Enabled      bool     `yaml:"enabled"`
 
 	// ExcludeChildSitemapPatterns: skip child sitemaps whose URL contains any of these substrings.
 	// Useful for filtering out category/tag/author/page sitemaps.

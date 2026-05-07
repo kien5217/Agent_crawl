@@ -27,6 +27,7 @@ var _ repository.CrawlWriteRepository = (*Store)(nil)
 var _ repository.LearningRepository = (*Store)(nil)
 var _ repository.ModelRepository = (*Store)(nil)
 var _ repository.HealthRepository = (*Store)(nil)
+var _ repository.StatsRepository = (*Store)(nil)
 var _ repository.LabelingRepository = (*Store)(nil)
 
 func (s *Store) Migrate(ctx context.Context, migrationsDir string) error {
@@ -63,6 +64,10 @@ func (s *Store) ListDocuments(ctx context.Context, filter repository.DocumentLis
 
 func (s *Store) GetDocumentByID(ctx context.Context, id int64) (*model.Document, error) {
 	return GetDocumentByID(ctx, s.db, id)
+}
+
+func (s *Store) GetDocumentWithKeywords(ctx context.Context, id int64, topics config.TopicsFile) (*model.Document, error) {
+	return GetDocumentWithKeywords(ctx, s.db, id, topics)
 }
 
 func (s *Store) UpdateDocumentML(ctx context.Context, in model.PredictedDocumentML) error {
@@ -131,6 +136,34 @@ func (s *Store) ListSteps(ctx context.Context, workflowID string) ([]model.StepE
 
 func (s *Store) GetHealthStats(ctx context.Context) (model.HealthStats, error) {
 	return GetHealthStats(ctx, s.db)
+}
+
+func (s *Store) GetDocumentCountsByDayTopic(ctx context.Context) ([]model.DocumentCountByDayTopic, error) {
+	return GetDocumentCountsByDayTopic(ctx, s.db)
+}
+
+func (s *Store) GetDocumentCountsByTopic(ctx context.Context) ([]model.DocumentCountByTopic, error) {
+	return GetDocumentCountsByTopic(ctx, s.db)
+}
+
+func (s *Store) GetTopSources(ctx context.Context, limit int) ([]model.SourceCount, error) {
+	return GetTopSources(ctx, s.db, limit)
+}
+
+func (s *Store) GetSourceFailCounts(ctx context.Context) ([]model.SourceFailCount, error) {
+	return GetSourceFailCounts(ctx, s.db)
+}
+
+func (s *Store) GetSourceLastPostTimes(ctx context.Context) ([]model.SourceLastPost, error) {
+	return GetSourceLastPostTimes(ctx, s.db)
+}
+
+func (s *Store) GetQueueFailureMetrics(ctx context.Context) (int64, int64, error) {
+	return GetQueueFailureMetrics(ctx, s.db)
+}
+
+func (s *Store) ListRecentSimhashDocuments(ctx context.Context, limit int) ([]model.NearDuplicateDoc, error) {
+	return ListRecentSimhashDocuments(ctx, s.db, limit)
 }
 
 func (s *Store) ListPendingLabelQueue(ctx context.Context, limit int) ([]model.LabelQueueEntry, error) {

@@ -39,7 +39,7 @@ export default function WorkflowStepsPage() {
           <tbody>
             {steps.map((s) => (
               <tr key={s.ID}>
-                <td>{s.Name}</td>
+                <td>{s.Name ?? s.StepName ?? '—'}</td>
                 <td>{s.Status}</td>
                 <td>{new Date(s.StartedAt).toLocaleString()}</td>
                 <td>{s.FinishedAt ? new Date(s.FinishedAt).toLocaleString() : '—'}</td>

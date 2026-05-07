@@ -11,6 +11,7 @@ type Document struct {
 	PublishedAt  *time.Time
 	ContentText  string
 	SourceID     string
+	Keywords     []string // rationale keywords for the topic
 }
 
 // PredictedDocumentML is write-back payload for ML prediction fields on a document.
@@ -34,6 +35,7 @@ type CrawledDocument struct {
 	Author          string
 	ContentText     string
 	ContentHash     string
+	ContentSimHash  uint64
 	TopicID         string
 	TopicScoresJSON string
 	Lang            string
